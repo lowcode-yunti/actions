@@ -35,7 +35,8 @@ jobs:
           node-version: 16
           repository: lowcode-yunti/cloudladder-fe
           ref: ${{inputs.sha}}
-          token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
+#          token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
+          token: ${{ secrets.AI_HORIZONS_COLLECTIVE_DISPATCH }}
 
       - name: Install Node.js
         uses: actions/setup-node@v3
