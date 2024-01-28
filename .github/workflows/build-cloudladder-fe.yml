@@ -75,9 +75,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Get short SHA
-        id: short-sha
-        run: echo "::set-output name=short_sha::$(echo ${inputs.sha::9})"
+#      - name: Get short SHA
+#        id: short-sha
+#        run: echo "::set-output name=short_sha::$(echo ${inputs.sha::9})"
 
       - name: Build and push FE Docker image
         uses: docker/build-push-action@v4.1.1
@@ -86,6 +86,6 @@ jobs:
           build-args: REACT_APP_COMMIT_ID=${{ steps.short-sha.outputs.short_sha }}
           push: true
           file: ./Dockerfile
-          tags: ${{inputs.docker_registry}}/${{env.IMAGE_NAME}}:${{ steps.short-sha.outputs.short_sha }},${{inputs.docker_registry}}/${{env.IMAGE_NAME}}:latest
+          tags: ${{inputs.docker_registry}}/${{env.IMAGE_NAME}}:${{ inputs.sha }},${{inputs.docker_registry}}/${{env.IMAGE_NAME}}:latest
           labels: ${{ steps.meta.outputs.labels }}
           platform: linux/amd64,linux/arm64,linux/arm/v7
