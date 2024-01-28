@@ -1,4 +1,4 @@
-name: Build Cloud Ladder FE
+name: Build Cloud Ladder Node Server
 
 on:
   workflow_dispatch:
