@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           node-version: 16
-          repository: lowcode-yunti/yunti
+          repository: lowcode-yunti/cloudladder-fe
           ref: ${{inputs.sha}}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
 
