@@ -12,15 +12,15 @@ on:
         required: true
         type: string
       docker_registry_name:
-        description: 'docker_registry'
+        description: 'docker_registry_name'
         required: true
         type: string
       docker_registry_password:
-        description: 'docker_registry'
+        description: 'docker_registry_password'
         required: true
         type: string
       docker_image_name:
-        description: 'docker_registry'
+        description: 'docker_image_name'
         required: true
         type: string
 env:
