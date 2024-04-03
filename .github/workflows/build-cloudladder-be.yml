@@ -38,6 +38,10 @@ jobs:
           ref: ${{inputs.sha}}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
 
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+        working-directory: ./server/api-service
+
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
@@ -79,6 +83,7 @@ jobs:
           tags: ${{inputs.docker_registry}}/${{env.IMAGE_NAME}}:${{ inputs.sha }},${{inputs.docker_registry}}/${{env.IMAGE_NAME}}:latest
           build-args: |
             DOCKER_BUILDKIT=1
+          target: lowcoder-ce-api-service
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
           load: false
