@@ -1,4 +1,4 @@
-name: Build Lowcoder CE API Service
+name: Build Cloud Ladder BE
 
 on:
   workflow_dispatch:
