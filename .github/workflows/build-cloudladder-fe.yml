@@ -3,9 +3,7 @@ name: 生产-cloudladder-fe
 on:
   workflow_dispatch:
 env:
-  NODE_VERSION: '16'
-  PNPM_VERSION: '8.14.1'
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}/cloudladder-fe
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}cloudladder-fe
   REPOSITORY: 'lowcode-yunti/cloudladder-fe'
   BRANCH_PROD: ${{ vars.BRANCH_PROD }}
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
