@@ -61,7 +61,7 @@ jobs:
           file: ./Dockerfile
           tags: |
             ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
-            ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
-            ${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
+            ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ fetch-code.steps.current-date.outputs.date }}
+            ${{ env.DOCKER_IMAGE }}:${{ fetch-code.steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
