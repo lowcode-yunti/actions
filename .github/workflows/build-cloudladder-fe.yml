@@ -10,11 +10,8 @@ env:
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
 jobs:
-  fetch-code:
+  build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      sha: ${{ steps.get-sha.outputs.sha }}
-      date: ${{ steps.current-date.outputs.date }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
@@ -30,21 +27,6 @@ jobs:
       - name: Get current date
         id: current-date
         run: echo "::set-output name=date::$(date +'%Y-%m-%d-%H-%M-%S')"
-
-      - name: Upload repository as artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: repo
-          path: .
-
-  build-and-push-image:
-    needs: fetch-code
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download repository artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: repo
 
       - name: Set up Docker Buildx
         id: buildx
@@ -67,12 +49,12 @@ jobs:
         uses: docker/build-push-action@v4.1.1
         with:
           context: .
-          build-args: REACT_APP_COMMIT_ID=${{ needs.fetch-code.outputs.sha }}
+          build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
           file: ./Dockerfile
           tags: |
             ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
-            ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ needs.fetch-code.outputs.date }}
-            ${{ env.DOCKER_IMAGE }}:${{ needs.fetch-code.outputs.sha }}
+            ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
