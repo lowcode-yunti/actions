@@ -26,7 +26,8 @@ jobs:
 
       - name: Get current date
         id: current-date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d-%H-%M-%S')"
+        run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+
 
       - name: Set up Docker Buildx
         id: buildx
