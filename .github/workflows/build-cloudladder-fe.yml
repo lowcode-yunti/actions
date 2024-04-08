@@ -31,10 +31,21 @@ jobs:
         id: current-date
         run: echo "::set-output name=date::$(date +'%Y-%m-%d-%H-%M-%S')"
 
+      - name: Upload repository as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: repo
+          path: .
+
   build-and-push-image:
     needs: fetch-code
     runs-on: ubuntu-latest
     steps:
+      - name: Download repository artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: repo
+
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
