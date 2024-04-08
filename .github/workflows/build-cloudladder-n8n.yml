@@ -2,7 +2,7 @@ name: PROD-n8n
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}cloudladder-fe
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}n8n
   REPOSITORY: 'lowcode-yunti/n8n'
   BRANCH_PROD: ${{ vars.BRANCH_PROD }}
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
