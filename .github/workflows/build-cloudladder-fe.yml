@@ -1,91 +1,72 @@
-name: Build Cloud Ladder FE
+name: 生产-构建并上传 cloudladder-fe 镜像
 
 on:
   workflow_dispatch:
-    inputs:
-      sha:
-        description: 'sha'
-        required: true
-        type: string
-      docker_registry:
-        description: 'docker_registry'
-        required: true
-        type: string
-      docker_registry_name:
-        description: 'docker_registry_name'
-        required: true
-        type: string
-      docker_registry_password:
-        description: 'docker_registry_password'
-        required: true
-        type: string
-      docker_image_name:
-        description: 'docker_image_name'
-        required: true
-        type: string
 env:
-  IMAGE_NAME: ${{inputs.docker_image_name}}
+  NODE_VERSION: '16'
+  PNPM_VERSION: '8.14.1'
+  DOCKER_IMAGE: ${{ env.DOCKER_WORKSPACE }}/cloudladder-fe
+  REPOSITORY: 'lowcode-yunti/cloudladder-fe'
+  BRANCH_PROD: ${{ env.BRANCH_PROD }}
+  DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
 
 jobs:
-  sync-repo-build-image:
+  fetch-code:
     runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.get-sha.outputs.sha }}
+      date: ${{ steps.current-date.outputs.date }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout the repository
+        uses: actions/checkout@v3
         with:
-          node-version: 16
-          repository: lowcode-yunti/cloudladder-fe
-          ref: ${{inputs.sha}}
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
 
+      - name: Get the latest commit SHA of the repository
+        id: get-sha
+        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+
+      - name: Get current date
+        id: current-date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d-%H-%M-%S')"
+
+  build-and-push-image:
+    needs: fetch-code
+    runs-on: ubuntu-latest
+    steps:
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: ${{ env.NODE_VERSION }}
 
-      - uses: pnpm/action-setup@v2.0.1
-        name: Install pnpm
-        id: pnpm-install
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2.0.1
         with:
-          version: 8.14.1
-          run_install: false
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        run: |
-          echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
-
-      - uses: actions/cache@v3
-        name: Setup pnpm cache
-        with:
-          path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
-          registry: ${{ inputs.docker_registry }}
-          username: ${{ inputs.docker_registry_name }}
-          password: ${{ inputs.docker_registry_password }}
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.DOCKER_IMAGE }}
 
-#      - name: Get short SHA
-#        id: short-sha
-#        run: echo "::set-output name=short_sha::$(echo ${inputs.sha::9})"
-
-      - name: Build and push FE Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v4.1.1
         with:
           context: .
-          build-args: REACT_APP_COMMIT_ID=${{ steps.short-sha.outputs.short_sha }}
+          build-args: REACT_APP_COMMIT_ID=${{ needs.fetch-code.outputs.sha }}
           push: true
           file: ./Dockerfile
-          tags: ${{inputs.docker_registry}}/${{env.IMAGE_NAME}}:${{ inputs.sha }},${{inputs.docker_registry}}/${{env.IMAGE_NAME}}:latest
+          tags: ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}, ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ needs.fetch-code.outputs.date }}, ${{ env.DOCKER_IMAGE }}:${{ needs.fetch-code.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-          platform: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
