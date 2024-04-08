@@ -35,6 +35,10 @@ jobs:
     needs: fetch-code
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -55,6 +59,9 @@ jobs:
           build-args: REACT_APP_COMMIT_ID=${{ needs.fetch-code.outputs.sha }}
           push: true
           file: ./Dockerfile
-          tags: ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}, ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ needs.fetch-code.outputs.date }}, ${{ env.DOCKER_IMAGE }}:${{ needs.fetch-code.outputs.sha }}
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
+            ${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
