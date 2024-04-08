@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
 env:
   DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}cloudladder-fe
-  REPOSITORY: 'lowcode-yunti/cloudladder-n8n'
+  REPOSITORY: 'lowcode-yunti/n8n'
   BRANCH_PROD: ${{ vars.BRANCH_PROD }}
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
