@@ -48,15 +48,16 @@ jobs:
 
       - name: Upload to oss
         id: upload_to_oss
-        uses: Menci/upload-to-oss@beta-v1
+        uses: chf007/aliyun-oss-upload-action@main
+        env:
+          OSS_ACCESS_KEY_ID: ${{ secrets.ALI_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.ALI_ACCESS_KEY_SECRET }}
         with:
-          access-key-id: ${{ secrets.ALI_ACCESS_KEY_ID }}
-          access-key-secret: ${{ secrets.ALI_ACCESS_KEY_SECRET }}
+          source-dir: packages/lowcoder/build
+          dest-dir: prod/${{ steps.current-date.outputs.date }}
           bucket: cloudladder-fe
-          endpoint: ${{ env.ALI_OSS_ENDPOINT }}
-          local-path: packages/lowcoder/build
-          remote-path: prod/${{ steps.current-date.outputs.date }}
-          retry: 5
+          region: oss-cn-beijing
+
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
