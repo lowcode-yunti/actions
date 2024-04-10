@@ -3,8 +3,8 @@ name: PROD-cloudladder-node-server
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}cloudladder-node-server
-  REPOSITORY: 'lowcode-yunti/lowcoder'
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}cloudladder-node-service
+  REPOSITORY: 'lowcode-yunti/cloudladder-node-service'
   BRANCH_PROD: ${{ vars.BRANCH_PROD }}
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
