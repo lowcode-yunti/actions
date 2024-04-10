@@ -49,12 +49,6 @@ jobs:
         with:
           python-version: 3.x
 
-      - name: Install OSSUtil
-        run: |
-          curl -O http://gosspublic.alicdn.com/ossutil/1.7.0/ossutil64
-          chmod 755 ossutil64
-          sudo mv ossutil64 /usr/local/bin/ossutil
-
       - name: Upload to oss
         id: upload_to_oss
         uses: tvrcgo/oss-action@master
