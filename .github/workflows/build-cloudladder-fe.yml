@@ -40,14 +40,10 @@ jobs:
 
       - name: Build
         run: PUBLIC_URL=https://${{env.ALI_OSS_ENDPOINT}}/${{ steps.current-date.outputs.date }} yarn build
+
 #      - name: Set up Docker Buildx
 #        id: buildx
 #        uses: docker/setup-buildx-action@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: 3.x
 
       - name: Upload to oss
         id: upload_to_oss
