@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [ 12.x, 14.x, 16.x ]
+        node-version: [ 18.x ]
 
     steps:
       - name: Checkout the repository
@@ -35,6 +35,8 @@ jobs:
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
 
+      - name: Yarn Install
+        run: yarn
 
       - name: Build
         run: PUBLIC_URL=https://${{env.ALI_OSS_ENDPOINT}}/${{ steps.current-date.outputs.date }} yarn build
