@@ -8,10 +8,15 @@ env:
   BRANCH_PROD: ${{ vars.BRANCH_PROD }}
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  ALI_OSS_ENDPOINT: cloudladder-fe.oss-cn-beijing.aliyuncs.com
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [ 12.x, 14.x, 16.x ]
+
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
@@ -19,6 +24,8 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
+          node-version: ${{ matrix.node-version }}
+          cache: 'yarn'
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -28,9 +35,34 @@ jobs:
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
 
+
+      - name: Build
+        run: PUBLIC_URL=https://${{env.ALI_OSS_ENDPOINT}}/${{ steps.current-date.outputs.date }} yarn build
 #      - name: Set up Docker Buildx
 #        id: buildx
 #        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: 3.x
+
+      - name: Install OSSUtil
+        run: |
+          curl -O http://gosspublic.alicdn.com/ossutil/1.7.0/ossutil64
+          chmod 755 ossutil64
+          sudo mv ossutil64 /usr/local/bin/ossutil
+
+      - name: Upload to OSS
+        env:
+          ALIYUN_OSS_ENDPOINT: ${{ env.ALI_OSS_ENDPOINT }}
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALI_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALI_ACCESS_KEY_SECRET }}
+          OSS_BUCKET: "cloudladder-fe"
+        run: |
+          ossutil config -e $ALIYUN_OSS_ENDPOINT -i $ALIYUN_ACCESS_KEY_ID -k $ALIYUN_ACCESS_KEY_SECRET -L CH
+          ossutil ls oss://$OSS_BUCKET
+          ossutil cp -r ./packages/lowcoder/build oss://$OSS_BUCKET/${{ steps.current-date.outputs.date }}/ # 修改为你要上传的目录
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
