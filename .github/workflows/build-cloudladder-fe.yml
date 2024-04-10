@@ -55,16 +55,16 @@ jobs:
           chmod 755 ossutil64
           sudo mv ossutil64 /usr/local/bin/ossutil
 
-      - name: Upload to OSS
-        env:
-          ALIYUN_OSS_ENDPOINT: ${{ env.ALI_OSS_ENDPOINT }}
-          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALI_ACCESS_KEY_ID }}
-          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALI_ACCESS_KEY_SECRET }}
-          OSS_BUCKET: "cloudladder-fe"
-        run: |
-          ossutil config -e $ALIYUN_OSS_ENDPOINT -i $ALIYUN_ACCESS_KEY_ID -k $ALIYUN_ACCESS_KEY_SECRET -L CH
-          ossutil ls oss://$OSS_BUCKET
-          ossutil cp -r ./packages/lowcoder/build oss://$OSS_BUCKET/${{ steps.current-date.outputs.date }}/ # 修改为你要上传的目录
+      - name: Upload to oss
+        id: upload_to_oss
+        uses: tvrcgo/oss-action@master
+        with:
+          key-id: ${{ secrets.ALI_ACCESS_KEY_ID }}
+          key-secret: ${{ secrets.ALI_ACCESS_KEY_SECRET }}
+          region: oss-cn-beijing
+          bucket: cloudladder-fe
+          assets: |
+            packages/lowcoder/build/**:/prod/${{ steps.current-date.outputs.date }}/
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
