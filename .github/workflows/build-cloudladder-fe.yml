@@ -13,9 +13,9 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [ 18.x ]
+#    strategy:
+#      matrix:
+#        node-version: [ 18.x ]
 
     steps:
       - name: Checkout the repository
@@ -24,7 +24,8 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
-          node-version: ${{ matrix.node-version }}
+#          node-version: ${{ matrix.node-version }}
+          node-version: '18.x'
           cache: 'yarn'
 
       - name: Get the latest commit SHA of the repository
