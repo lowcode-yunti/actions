@@ -9,6 +9,9 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   ALI_OSS_ENDPOINT: cloudladder-fe.oss-cn-beijing.aliyuncs.com
+  RANCHER_API_ENDPOINT: https://rancher.cloudladder.net.cn
+  RANCHER_PROJECT: c-m-fftwrctv:p-ltfp6
+  RANCHER_DEPLOYMENT_NAME: cloudladder-fe
 
 jobs:
   build-and-push:
@@ -83,3 +86,13 @@ jobs:
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
 #          platforms: linux/amd64,linux/arm64
+
+  dispatch:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Dev
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
