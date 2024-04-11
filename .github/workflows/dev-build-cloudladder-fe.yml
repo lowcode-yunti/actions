@@ -87,7 +87,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 #          platforms: linux/amd64,linux/arm64
 
-  dispatch:
+  dispatch-deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
