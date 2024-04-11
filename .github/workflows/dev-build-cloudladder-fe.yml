@@ -40,7 +40,7 @@ jobs:
         run: yarn
 
       - name: Build
-        run: PUBLIC_URL=https://${{env.ALI_OSS_ENDPOINT}}/prod/${{ steps.current-date.outputs.date }} yarn build
+        run: PUBLIC_URL=https://${{env.ALI_OSS_ENDPOINT}}/staging/${{ steps.current-date.outputs.date }} yarn build
 
 #      - name: Set up Docker Buildx
 #        id: buildx
