@@ -1,4 +1,4 @@
-name: PROD-n8n
+name: DEV-n8n
 on:
   workflow_dispatch:
 env:

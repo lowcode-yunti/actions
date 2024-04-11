@@ -1,4 +1,4 @@
-name: PROD-cloudladder-node-server
+name: DEV-cloudladder-node-server
 
 on:
   workflow_dispatch:

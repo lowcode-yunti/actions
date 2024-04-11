@@ -1,4 +1,4 @@
-name: PROD-flowise
+name: DEV-flowise
 on:
   workflow_dispatch:
 env:

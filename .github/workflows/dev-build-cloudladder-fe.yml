@@ -1,4 +1,4 @@
-name: PROD-cloudladder-fe
+name: DEV-cloudladder-fe
 
 on:
   workflow_dispatch:
