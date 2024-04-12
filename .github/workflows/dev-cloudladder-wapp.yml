@@ -62,7 +62,7 @@ jobs:
         id: preview
         uses: crazyurus/miniprogram-action@1.0.0
         with:
-          action_type: preview
+          action_type: upload
           project_path: ./dist
           version: ${{ steps.current-date.outputs.date }}${{ steps.get-sha.outputs.sha }}
           description: ${{ steps.last-commits.outputs.commits }}
