@@ -1,4 +1,4 @@
-name: DEV-cloudladder-be
+name: DEV-cloudladder-fe
 
 on:
   workflow_dispatch:
@@ -8,6 +8,9 @@ env:
   BRANCH_PROD: dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
+  RANCHER_PROJECT: c-m-fftwrctv:p-ltfp6
+  RANCHER_DEPLOYMENT_NAME: cloudladder-be
 
 jobs:
   build-and-push:
@@ -28,10 +31,6 @@ jobs:
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
 
-      #      - name: Set up Docker Buildx
-      #        id: buildx
-      #        uses: docker/setup-buildx-action@v3
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -49,13 +48,22 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: deploy/docker/Dockerfile
-          build-args: DOCKER_BUILDKIT=1
+          build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          load: false
+          file: ./Dockerfile
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-#          platforms: linux/amd64,linux/arm64
+  #          platforms: linux/amd64,linux/arm64
+
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Dev
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
