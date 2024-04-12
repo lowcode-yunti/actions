@@ -1,4 +1,4 @@
-name: Preview MiniProgram
+name: Upload Dev MiniProgram
 on:
   workflow_dispatch:
 env:
