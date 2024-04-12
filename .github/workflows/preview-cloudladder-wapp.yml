@@ -27,7 +27,7 @@ jobs:
       - name: Get last few commits
         id: last-commits
         run: |
-          commits=$(git log -n 3 --pretty=format:"%h - %s")
+          commits=$(git log -n 3 --pretty=format:"%h - %s" | tr '\n' ' ' | cut -c 1-100)
           echo "::set-output name=commits::${commits}"
 
       - name: Install Node.js
