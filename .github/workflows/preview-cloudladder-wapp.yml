@@ -4,7 +4,7 @@ on:
 env:
   REPOSITORY: 'lowcode-yunti/cloudladder-miniprogram'
 jobs:
-  preview:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -17,11 +17,17 @@ jobs:
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
-        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+        run: echo "::set-output name=sha::$(git rev-parse --short=7 HEAD)"
 
       - name: Get current date
         id: current-date
-        run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+        run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y%m%d%H%M%S')"
+
+      - name: Get last few commits
+        id: last-commits
+        run: |
+          commits=$(git log -n 3 --pretty=format:"%h - %s")
+          echo "::set-output name=commits::${commits}"
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -56,9 +62,10 @@ jobs:
         id: preview
         uses: crazyurus/miniprogram-action@1.0.0
         with:
-          action_type: preview
+          action_type: upload
           project_path: ./dist
-          version: ${{ steps.get-sha.outputs.sha }}
+          version: ${{ steps.current-date.outputs.date }}${{ steps.get-sha.outputs.sha }}
+          description: ${{ steps.last-commits.outputs.commits }}
         env:
           PRIVATE_KEY: ${{ secrets.WAPP_PRIVATE_KEY }}
-# TODO 增加预览二维码推送飞书  base64 ${{ steps.preview.outputs.preview_qrcode }}
+# TODO 增加预览二维码推送飞书 base64 ${{ steps.preview.outputs.preview_qrcode }}
