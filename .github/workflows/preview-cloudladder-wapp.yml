@@ -56,6 +56,7 @@ jobs:
 
       - name: Build MiniProgram
         run: |
+          pnpm i
           pnpm build:weapp
 
       - name: Compile
@@ -68,4 +69,18 @@ jobs:
           description: ${{ steps.last-commits.outputs.commits }}
         env:
           PRIVATE_KEY: ${{ secrets.WAPP_PRIVATE_KEY }}
-# TODO 增加预览二维码推送飞书 base64 ${{ steps.preview.outputs.preview_qrcode }}
+
+      - name: Send feishu message
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: ${{ secrets.FEISHU_BOT_WEBHOOK_URL }}
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: 🎉 小程序预览版新版本发布！
+                content:
+                - - tag: a
+                    text: 点击查看预览二维码
+                    href: ${{ steps.preview.outputs.preview_qrcode }}
+              
