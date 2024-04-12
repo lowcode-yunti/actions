@@ -1,4 +1,4 @@
-name: DEV-cloudladder-fe
+name: DEV-cloudladder-node-service
 
 on:
   workflow_dispatch:

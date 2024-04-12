@@ -1,4 +1,4 @@
-name: DEV-cloudladder-fe
+name: DEV-cloudladder-flowise
 
 on:
   workflow_dispatch:
