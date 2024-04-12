@@ -2,6 +2,7 @@ name: Preview MiniProgram
 on:
   workflow_dispatch:
 env:
+  BRANCH_PROD: pre
   REPOSITORY: 'lowcode-yunti/cloudladder-miniprogram'
 jobs:
   build-and-push:
