@@ -102,7 +102,7 @@ jobs:
                 - - tag: at
                     user_id: 'all'
                 - - tag: text
-                    text: ${{ steps.last-commits.outputs.commits }}
+                    text: "${{ steps.last-commits.outputs.commits }}"
                 - - tag: text
                     text: '请使用微信扫码预览'
                 - - tag: img
