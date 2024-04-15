@@ -71,9 +71,6 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.WAPP_PRIVATE_KEY }}
 
-      - name: Install ImageMagick
-        run: sudo apt-get install -y imagemagick
-
       - name: Decode Base64 and Convert to PNG
         run: |
           echo "${{ steps.preview.outputs.preview_qrcode }}"
