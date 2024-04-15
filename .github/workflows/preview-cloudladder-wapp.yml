@@ -99,7 +99,7 @@ jobs:
           content: |
             post:
               zh_cn:
-                title: 🎉 小程序预览版新版本发布！@${{ steps.get-sha.outputs.sha }}
+                title: 🎉 有新的小程序预览版发布了！@${{ steps.get-sha.outputs.sha }}
                 content:
                 - - tag: text
                     text: '请使用微信扫码预览'
