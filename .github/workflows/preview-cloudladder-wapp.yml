@@ -74,7 +74,7 @@ jobs:
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
         with:
-          url: ${{ secrets.FEISHU_BOT_WEBHOOK_URL }}
+          url: ${{ secrets.FEISHU_ROBOT_WEBHOOK_URL }}
           msg_type: post
           content: |
             post:
