@@ -73,7 +73,7 @@ jobs:
 
       - name: Decode Image
         run: |
-          echo '${{ secrets.BASE64_IMAGE }}' | base64 --decode > image.jpg
+          echo '${{ steps.preview.outputs.preview_qrcode }}' | base64 --decode > image.jpg
 
       - name: Install jq
         run: sudo apt-get install jq
