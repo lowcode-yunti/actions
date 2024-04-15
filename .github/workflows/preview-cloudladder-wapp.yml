@@ -97,7 +97,7 @@ jobs:
           content: |
             post:
               zh_cn:
-                title: 🎉 有新的小程序预览版发布了！@${{ steps.get-sha.outputs.sha }}
+                title: 🎉 有新的小程序预览版发布了！
                 content:
                 - - tag: at
                     user_id: 'all'
