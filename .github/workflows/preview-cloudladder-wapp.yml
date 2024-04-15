@@ -87,7 +87,7 @@ jobs:
           --header 'Authorization: Bearer ${{ secrets.FEI_SHU_TENANT_ACCESS_TOKEN }}' \
           --header 'Content-Type: multipart/form-data' \
           --form 'image_type="message"' \
-          --form 'image=@"${{ steps.convert-image.outputs.png_path }}"')
+          --form 'image=@"output_image.png"')
           echo "Full API Response: $RESPONSE"
           IMAGE_KEY=$(echo $RESPONSE | jq -r '.data.image_key')
           echo "Extracted Image Key: $IMAGE_KEY"
