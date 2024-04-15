@@ -71,6 +71,15 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.WAPP_PRIVATE_KEY }}
 
+      - name: Install ImageMagick
+        run: sudo apt-get install -y imagemagick
+
+      - name: Convert Image Format to PNG
+        id: convert-image
+        run: |
+          convert "${{ steps.preview.outputs.preview_qrcode_path }}" image.png
+          echo "::set-output name=png_path::$(pwd)/image.png"
+
       - name: Upload Image to Feishu and Extract Image Key
         id: get-image
         run: |
@@ -78,7 +87,7 @@ jobs:
           --header 'Authorization: Bearer ${{ secrets.FEI_SHU_TENANT_ACCESS_TOKEN }}' \
           --header 'Content-Type: multipart/form-data' \
           --form 'image_type="message"' \
-          --form 'image=@"${{ steps.preview.outputs.preview_qrcode_path }}"')
+          --form 'image=@"${{ steps.convert-image.outputs.png_path }}"')
           echo "Full API Response: $RESPONSE"
           IMAGE_KEY=$(echo $RESPONSE | jq -r '.data.image_key')
           echo "Extracted Image Key: $IMAGE_KEY"
