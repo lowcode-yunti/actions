@@ -71,7 +71,7 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.WAPP_PRIVATE_KEY }}
 
-      - name: Decode Base64 and Convert to PNG
+      - name: Decode Base64 QR Code
         run: |
           echo "${{ steps.preview.outputs.preview_qrcode }}"
           echo "${{ steps.preview.outputs.preview_qrcode }}" | sed 's/^data:image\/jpeg;base64,//' | base64 --decode > output_image.jpeg
@@ -87,7 +87,7 @@ jobs:
           echo "Full API Response: $RESPONSE"
           IMAGE_KEY=$(echo $RESPONSE | jq -r '.data.image_key')
           echo "Extracted Image Key: $IMAGE_KEY"
-          echo "IMAGE_KEY=$IMAGE_KEY" >> $GITHUB_ENV
+          echo "::set-output name=imageKey::${IMAGE_KEY}"
 
       - name: Send feishu message
         uses: foxundermoon/feishu-action@v2
@@ -102,7 +102,7 @@ jobs:
                 - - tag: text
                     text: '请使用微信扫码预览'
                 - - tag: img
-                    image_key: ${{ steps.get-image.outputs.IMAGE_KEY }}
+                    image_key: ${{ steps.get-image.outputs.imageKey }}
                     width:300
                     height:300
               
