@@ -71,13 +71,6 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.WAPP_PRIVATE_KEY }}
 
-      - name: Decode Image
-        run: |
-          echo '${{ steps.preview.outputs.preview_qrcode }}' | base64 --decode > image.jpg
-
-      - name: Install jq
-        run: sudo apt-get install jq
-
       - name: Upload Image to Feishu and Extract Image Key
         id: get-image
         run: |
@@ -85,7 +78,7 @@ jobs:
           --header 'Authorization: Bearer ${{ secrets.FEI_SHU_TENANT_ACCESS_TOKEN }}' \
           --header 'Content-Type: multipart/form-data' \
           --form 'image_type="message"' \
-          --form 'image=@image.jpg')
+          --form 'image=@"${{ steps.preview.outputs.preview_qrcode_path }}"')
           echo "Full API Response: $RESPONSE"
           IMAGE_KEY=$(echo $RESPONSE | jq -r '.data.image_key')
           echo "Extracted Image Key: $IMAGE_KEY"
