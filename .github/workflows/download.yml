@@ -1,0 +1,12 @@
+name: PROD-cloudladder-be
+
+on:
+  workflow_dispatch:
+env:
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: download gguf
+        run: wget https://huggingface.co/FaradayDotDev/llama-3-8b-Instruct-GGUF/resolve/main/llama-3-8b-Instruct.Q8_0.gguf?download=true
