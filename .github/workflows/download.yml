@@ -1,4 +1,4 @@
-name: PROD-cloudladder-be
+name: download GGUF
 
 on:
   workflow_dispatch:
