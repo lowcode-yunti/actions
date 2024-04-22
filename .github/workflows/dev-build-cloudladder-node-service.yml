@@ -3,7 +3,7 @@ name: DEV-cloudladder-node-service
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}node-service
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}dev-node-service
   REPOSITORY: 'lowcode-yunti/node-service'
   BRANCH_PROD: dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}

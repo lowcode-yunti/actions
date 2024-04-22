@@ -9,3 +9,4 @@ jobs:
     steps:
       - name: download gguf
         run: wget -q --show-progress https://huggingface.co/FaradayDotDev/llama-3-8b-Instruct-GGUF/resolve/main/llama-3-8b-Instruct.Q8_0.gguf?download=true
+#                run: wget -q --show-progress https://hf-mirror.com/FaradayDotDev/llama-3-8b-Instruct-GGUF/resolve/main/llama-3-8b-Instruct.Q8_0.gguf?download=true
