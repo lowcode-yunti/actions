@@ -7,9 +7,10 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: download civitai
+      - name: Download Civitai Model
         run: |
-          wget -L --content-disposition -q --show-progress https://civitai.com/api/download/models/455150
+          wget -L --content-disposition --verbose -q --show-progress https://civitai.com/api/download/models/455150
+        shell: /usr/bin/bash -e {0}
 
       - name: Upload file as artifact
         uses: actions/upload-artifact@v4
