@@ -12,12 +12,11 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: Download civitai
+      - name: Mock download
         run: |
-          wget -L --content-disposition --progress=bar:force -q --show-progress "${{ github.event.inputs.download_url }}"
-          filename=$(ls -Art | tail -n 1)
-          echo "Downloaded file: $filename"
-          echo "::set-output name=filename::$filename"
+          echo "This is a test file for SSH transfer." > test_file_for_ssh.txt
+          echo "Mocked file: test_file_for_ssh.txt created."
+          echo "::set-output name=filename::test_file_for_ssh.txt"
 
       - name: Install SSH client
         run: |
@@ -35,4 +34,6 @@ jobs:
 
       - name: Copy file to remote server
         run: |
-          scp "${{ steps.download.outputs.filename }}" root@${{ secrets.A100_HOST }}:/data/ai/_temp_civitai_models
+          scp test_file_for_ssh.txt root@${{ secrets.A100_HOST }}:/data/ai/_temp_civitai_models
+        env:
+          filename: ${{ steps.download.outputs.filename }}
