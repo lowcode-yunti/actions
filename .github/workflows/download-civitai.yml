@@ -1,0 +1,18 @@
+name: download civitai
+
+on:
+  workflow_dispatch:
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: download civitai
+        run: |
+          wget --content-disposition -q --show-progress https://civitai.com/api/download/models/455150
+
+      - name: Upload file as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # 此处 `*` 表示上传下载目录中的所有文件
+          path: ./*
