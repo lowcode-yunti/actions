@@ -9,7 +9,7 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-fftwrctv:p-ltfp6
+  RANCHER_PROJECT: c-m-trbd5nlq:p-bdpw8
   RANCHER_DEPLOYMENT_NAME: n8n
 
 jobs:

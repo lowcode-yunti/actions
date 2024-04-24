@@ -10,7 +10,7 @@ env:
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   ALI_OSS_ENDPOINT: cloudladder-fe.oss-cn-beijing.aliyuncs.com
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-fftwrctv:p-ltfp6
+  RANCHER_PROJECT: c-m-trbd5nlq:p-bdpw8
   RANCHER_DEPLOYMENT_NAME: cloudladder-fe
 
 jobs:
