@@ -12,14 +12,11 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: Download civitai and Extract filename
-        id: download
+      - name: Download civitai
         run: |
-          # 使用 wget 下载文件，并尝试获取服务器指定的文件名
-          wget -L --content-disposition --progress=bar:force -q --show-progress "${{ github.event.inputs.download_url }}" -O temp_file
+          wget -L --content-disposition --progress=bar:force -q --show-progress "${{ github.event.inputs.download_url }}"
           filename=$(ls -Art | tail -n 1)
-          mv temp_file "$filename"
-          echo "Downloaded and renamed to $filename"
+          echo "Downloaded file: $filename"
           echo "::set-output name=filename::$filename"
 
       - name: Install SSH client
@@ -39,8 +36,3 @@ jobs:
       - name: Copy file to remote server
         run: |
           scp "${{ steps.download.outputs.filename }}" root@${{ secrets.A100_HOST }}:/data/ai/_temp_civitai_models
-
-      - name: Upload file as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          path: "${{ steps.download.outputs.filename }}"
