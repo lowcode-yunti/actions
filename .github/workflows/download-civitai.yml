@@ -1,4 +1,4 @@
-name: download civitai
+name: download and transfer civitai
 
 on:
   workflow_dispatch:
@@ -12,11 +12,35 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: download civitai
+      - name: Download civitai and Extract filename
+        id: download
         run: |
-          wget -L --content-disposition --progress=bar:force -q --show-progress '${{ github.event.inputs.download_url }}'
+          # 使用 wget 下载文件，并尝试获取服务器指定的文件名
+          wget -L --content-disposition --progress=bar:force -q --show-progress "${{ github.event.inputs.download_url }}" -O temp_file
+          filename=$(ls -Art | tail -n 1)
+          mv temp_file "$filename"
+          echo "Downloaded and renamed to $filename"
+          echo "::set-output name=filename::$filename"
+
+      - name: Install SSH client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-client
+
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.A100_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan ${{ secrets.A100_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy file to remote server
+        run: |
+          scp "${{ steps.download.outputs.filename }}" root@${{ secrets.A100_HOST }}:/data/ai/_temp_civitai_models
 
       - name: Upload file as artifact
         uses: actions/upload-artifact@v4
         with:
-          path: ./*
+          path: "${{ steps.download.outputs.filename }}"
