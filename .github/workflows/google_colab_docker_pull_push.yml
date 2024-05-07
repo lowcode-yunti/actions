@@ -1,9 +1,10 @@
 name: Google Colab Docker Pull and Push
 
 on:
-  push:
-    branches:
-      - main  # 根据你的需求更改触发事件的分支
+  workflow_dispatch:
+env:
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
 jobs:
   build:
