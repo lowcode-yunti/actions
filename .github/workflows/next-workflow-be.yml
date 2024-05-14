@@ -5,7 +5,7 @@ on:
 env:
   DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}next-workflow-be
   REPOSITORY: 'lowcode-yunti/workflow'
-  BRANCH_PROD: dev
+  BRANCH_PROD: next
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
