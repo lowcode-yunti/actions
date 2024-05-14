@@ -1,4 +1,4 @@
-name: DEV-cloudladder-n8n
+name: NEXT-WORKFLOW-BE
 
 on:
   workflow_dispatch:
