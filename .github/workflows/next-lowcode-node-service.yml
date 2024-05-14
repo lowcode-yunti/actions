@@ -1,16 +1,16 @@
-name: next-lowcode-fe
+name: NEXT-LOWCODE-NODE-SERVICE
 
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}next-lowcode-fe
-  REPOSITORY: 'lowcode-yunti/next'
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}next-lowcode-node-service
+  REPOSITORY: 'lowcode-yunti/next-lowcode-node-service'
   BRANCH_PROD: next
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
   RANCHER_PROJECT: c-m-trbd5nlq:p-bdpw8
-  RANCHER_DEPLOYMENT_NAME: cloudladder-fe
+  RANCHER_DEPLOYMENT_NAME: node-service
 
 jobs:
   build-and-push:
@@ -22,8 +22,6 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
-          node-version: '18.x'
-          cache: 'pnpm'
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -32,12 +30,6 @@ jobs:
       - name: Get current date
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
-
-      - name: Yarn Install
-        run: yarn
-
-      - name: Build
-        run: PUBLIC_URL=/ yarn build
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -55,16 +47,16 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./client
+          context: .
           build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          file: ./DockerfileFE
+          file: ./Dockerfile
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-#          platforms: linux/amd64,linux/arm64
+  #          platforms: linux/amd64,linux/arm64
 
   dispatch-deploy:
     needs: build-and-push
