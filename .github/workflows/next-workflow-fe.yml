@@ -19,6 +19,7 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
+          node-version: 18
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -27,11 +28,6 @@ jobs:
       - name: Get current date
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm

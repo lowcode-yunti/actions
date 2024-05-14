@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 env:
   DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}next-lowcode-fe
-  REPOSITORY: 'lowcode-yunti/next'
+  REPOSITORY: 'lowcode-yunti/next-lowcode-fe'
   BRANCH_PROD: next
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
@@ -22,8 +22,7 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
-          node-version: '18'
-          cache: 'pnpm'
+          node-version: 18
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -54,7 +53,6 @@ jobs:
 
       - name: pnpm Install
         run: pnpm install
-
 
       - name: Build
         run: PUBLIC_URL=/ pnpm build
