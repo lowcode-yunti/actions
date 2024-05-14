@@ -51,7 +51,7 @@ jobs:
         run: pnpm install
 
       - name: Build
-        run: NODE_OPTIONS="--max-old-space-size=8192" VUE_APP_PUBLIC_PATH=/wf pnpm build:frontend
+        run: NODE_OPTIONS="--max-old-space-size=8192" VUE_APP_PUBLIC_PATH=wf pnpm build:frontend
 
       - name: Hack
         run: rm ./.dockerignore
