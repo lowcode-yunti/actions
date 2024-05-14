@@ -3,7 +3,7 @@ name: NEXT-WORKFLOW-FE
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}workflow
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}next-workflow-fe
   REPOSITORY: 'lowcode-yunti/workflow'
   BRANCH_PROD: next
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
