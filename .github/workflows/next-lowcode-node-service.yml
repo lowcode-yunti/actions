@@ -10,7 +10,7 @@ env:
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
   RANCHER_PROJECT: c-m-trbd5nlq:p-bdpw8
-  RANCHER_DEPLOYMENT_NAME: node-service
+  RANCHER_DEPLOYMENT_NAME: next-lowcode-node-service
 
 jobs:
   build-and-push:
