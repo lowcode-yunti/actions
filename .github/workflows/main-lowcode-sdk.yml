@@ -1,16 +1,16 @@
-name: NEXT-LOWCODE-RAG-SERVICE
+name: MAIN-LOWCODE-SDK
 
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}next-rag-service
-  REPOSITORY: 'lowcode-yunti/rag_server'
-  BRANCH_PROD: next
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}main-lowcode-sdk
+  REPOSITORY: 'lowcode-yunti/next-lowcode-fe'
+  BRANCH_PROD: main
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
   RANCHER_PROJECT: c-m-trbd5nlq:p-bdpw8
-  RANCHER_DEPLOYMENT_NAME: next-rag-service
+  RANCHER_DEPLOYMENT_NAME: next-lowcode-sdk
 
 jobs:
   build-and-push:
@@ -22,6 +22,7 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
+          node-version: 18
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -30,6 +31,31 @@ jobs:
       - name: Get current date
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: pnpm Install
+        run: pnpm install
+
+      - name: Build
+        run: cd packages/lowcoder-sdk-webpack-bundle && NODE_OPTIONS="--max-old-space-size=8192" PUBLIC_URL=/ pnpm build
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -50,7 +76,7 @@ jobs:
           context: .
           build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          file: ./Dockerfile
+          file: ./DockerfileSDK
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
@@ -58,12 +84,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 #          platforms: linux/amd64,linux/arm64
 
-  dispatch-deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy Dev
-        run: |
-          curl -X POST \
-            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
-            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
+#  dispatch-deploy:
+#    needs: build-and-push
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Deploy Dev
+#        run: |
+#          curl -X POST \
+#            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
+#            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
