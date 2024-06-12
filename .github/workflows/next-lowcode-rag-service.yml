@@ -9,7 +9,7 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-trbd5nlq:p-bdpw8
+  RANCHER_PROJECT: c-m-b7pbdlr5:p-tn6wn
   RANCHER_DEPLOYMENT_NAME: next-rag-service
 
 jobs:
@@ -67,3 +67,6 @@ jobs:
           curl -X POST \
             -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
             "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
+          
+          
+          
