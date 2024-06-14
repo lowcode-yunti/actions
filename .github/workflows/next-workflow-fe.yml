@@ -69,7 +69,7 @@ jobs:
           region: oss-cn-beijing
           bucket: cloudladder-fe
           assets: |
-            packages/lowcoder/build/**:/staging/cloudladder-wf/${{ steps.current-date.outputs.date }}/
+            packages/editor-ui/dist/**:/staging/cloudladder-wf/${{ steps.current-date.outputs.date }}/
 
       - name: Hack
         run: rm ./.dockerignore
