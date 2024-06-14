@@ -54,7 +54,7 @@ jobs:
         run: pnpm install
 
       - name: Build
-        run: NODE_OPTIONS="--max-old-space-size=8192" VITE_VERSION=${{ steps.get-sha.outputs.sha }} VUE_APP_PUBLIC_PATH=https://${{vars.ALI_OSS_ENDPOINT}}/staging/cloudladder-fe/${{ steps.current-date.outputs.date }} pnpm build:frontend
+        run: NODE_OPTIONS="--max-old-space-size=8192" VITE_VERSION=${{ steps.get-sha.outputs.sha }} VUE_APP_PUBLIC_PATH=https://${{vars.ALI_OSS_ENDPOINT}}/staging/cloudladder-wf/${{ steps.current-date.outputs.date }} pnpm build:frontend
 
       - name: Set up Docker Buildx
         id: buildx
@@ -69,7 +69,7 @@ jobs:
           region: oss-cn-beijing
           bucket: cloudladder-fe
           assets: |
-            packages/lowcoder/build/**:/staging/cloudladder-fe/${{ steps.current-date.outputs.date }}/
+            packages/lowcoder/build/**:/staging/cloudladder-wf/${{ steps.current-date.outputs.date }}/
 
       - name: Hack
         run: rm ./.dockerignore
