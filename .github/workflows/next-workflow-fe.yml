@@ -71,6 +71,17 @@ jobs:
           assets: |
             packages/editor-ui/dist/**:/staging/cloudladder-wf/${{ steps.current-date.outputs.date }}/
 
+      - name: Upload Chat to oss
+        id: upload_chat_to_oss
+        uses: tvrcgo/oss-action@master
+        with:
+          key-id: ${{ secrets.ALI_ACCESS_KEY_ID }}
+          key-secret: ${{ secrets.ALI_ACCESS_KEY_SECRET }}
+          region: oss-cn-beijing
+          bucket: cloudladder-fe
+          assets: |
+            packages/@n8n/chat/dist/**:/staging/cloudladder-wf-chat/${{ steps.get-sha.outputs.sha }}/
+
       - name: Hack
         run: rm ./.dockerignore
 
