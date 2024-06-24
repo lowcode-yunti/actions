@@ -80,7 +80,7 @@ jobs:
           region: oss-cn-beijing
           bucket: cloudladder-fe
           assets: |
-            packages/@n8n/chat/dist/**:/staging/cloudladder-wf-chat/${{ steps.get-sha.outputs.sha }}/
+            packages/@wf/chat/dist/**:/staging/cloudladder-wf-chat/${{ steps.get-sha.outputs.sha }}/
 
       - name: Hack
         run: rm ./.dockerignore
