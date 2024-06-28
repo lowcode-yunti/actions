@@ -54,7 +54,7 @@ jobs:
         run: pnpm install
 
       - name: Build
-        run: NODE_OPTIONS="--max-old-space-size=8192" VITE_VERSION=${{ steps.get-sha.outputs.sha }} VUE_APP_PUBLIC_PATH=https://${{vars.ALI_OSS_ENDPOINT}}/prod/cloudladder-wf/${{ steps.current-date.outputs.date }} pnpm build:frontend
+        run: NODE_OPTIONS="--max-old-space-size=8192" VITE_VERSION=${{ steps.get-sha.outputs.sha }} VUE_APP_PUBLIC_PATH=https://${{vars.ALI_OSS_ENDPOINT}}/prod/cloudladder-wf/${{ steps.current-date.outputs.date }} INCLUDE_VUE=true pnpm build:frontend
 
       - name: Set up Docker Buildx
         id: buildx
@@ -70,6 +70,17 @@ jobs:
           bucket: cloudladder-fe
           assets: |
             packages/editor-ui/dist/**:/prod/cloudladder-wf/${{ steps.current-date.outputs.date }}/
+
+      - name: Upload Chat to oss
+        id: upload_chat_to_oss
+        uses: tvrcgo/oss-action@master
+        with:
+          key-id: ${{ secrets.ALI_ACCESS_KEY_ID }}
+          key-secret: ${{ secrets.ALI_ACCESS_KEY_SECRET }}
+          region: oss-cn-beijing
+          bucket: cloudladder-fe
+          assets: |
+            packages/@wf/chat/dist/**:/prod/cloudladder-wf-chat/${{ steps.get-sha.outputs.sha }}/
 
       - name: Hack
         run: rm ./.dockerignore

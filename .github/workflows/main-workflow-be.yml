@@ -48,7 +48,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
+          build-args: CHAT_PUBLIC_PATH=https://${{vars.ALI_OSS_ENDPOINT}}/prod/cloudladder-wf-chat/${{ steps.get-sha.outputs.sha }}
           push: true
           file: ./DockerfileBE
           tags: |
