@@ -82,12 +82,12 @@ jobs:
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
 
-#  dispatch-deploy:
-#    needs: build-and-push
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Deploy Dev
-#        run: |
-#          curl -X POST \
-#            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
-#            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Dev
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
