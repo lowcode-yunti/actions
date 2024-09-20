@@ -5,12 +5,12 @@ on:
 env:
   DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}dev-km-python
   REPOSITORY: 'lowcode-yunti/knowledge-management'
-  BRANCH_PROD: feat-auto-parse
+  BRANCH_PROD: dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
   RANCHER_PROJECT: c-m-b7pbdlr5:p-tn6wn
-  RANCHER_DEPLOYMENT_NAME: km-python
+  RANCHER_DEPLOYMENT_NAME: km-python-service
 
 jobs:
   build-and-push:
@@ -58,12 +58,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
   #          platforms: linux/amd64,linux/arm64
 
-#  dispatch-deploy:
-#    needs: build-and-push
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Deploy Dev
-#        run: |
-#          curl -X POST \
-#            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
-#            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Dev
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
