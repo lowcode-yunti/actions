@@ -1,4 +1,4 @@
-name: DEV-km-python
+name: DEV-km-python-service
 
 on:
   workflow_dispatch:
