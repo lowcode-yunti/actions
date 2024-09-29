@@ -1,0 +1,55 @@
+name: MAIN-build-km-python-service-runner-base
+
+on:
+  workflow_dispatch:
+env:
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}main-km-base-runner-dockerfile
+  REPOSITORY: 'lowcode-yunti/actions'
+  BRANCH_PROD: main
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.BRANCH_PROD }}
+          token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
+
+      - name: Get the latest commit SHA of the repository
+        id: get-sha
+        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+
+      - name: Get current date
+        id: current-date
+        run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./
+          push: true
+          file: ./docker/km/km.base.runner.dockerfile
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
