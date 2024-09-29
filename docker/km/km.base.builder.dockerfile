@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry  # 创建符号链接
 
 RUN pip config set global.timeout 10000 \
-    && pip config set global.retries 10 \
+    && pip config set global.retries 10
 
 # 确保 PATH 变量已更新，安装其他 Python 包
 RUN pip install nltk --default-timeout=10000 \
