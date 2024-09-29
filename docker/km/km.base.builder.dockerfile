@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libsm6 l
     && pipx ensurepath \
     && pipx install poetry==1.8.3 \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && source ~/.bashrc \
-    && pip install nltk --default-timeout=10000 \
+    && source ~/.bashrc
+
+RUN pip install nltk --default-timeout=10000 \
     && python -c "import nltk; nltk.download('punkt_tab'); nltk.download('punkt'); nltk.download('wordnet')"
