@@ -23,6 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip config set global.timeout 10000 \
     && pip config set global.retries 10
 
-# 确保 PATH 变量已更新，安装其他 Python 包
 RUN pip install nltk --default-timeout=10000 \
-    && python -c "import nltk; nltk.download('punkt'); nltk.download('wordnet')"
+    && python -c "import nltk;nltk.download('punkt_tab');nltk.download('wordnet')"
+
