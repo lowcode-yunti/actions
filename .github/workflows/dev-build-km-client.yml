@@ -1,0 +1,99 @@
+name: DEV-km-client
+
+on:
+  workflow_dispatch:
+env:
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}dev-km-client
+  REPOSITORY: 'lowcode-yunti/knowledge-web'
+  BRANCH_PROD: dev
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
+  RANCHER_PROJECT: c-m-b7pbdlr5:p-tn6wn
+  RANCHER_DEPLOYMENT_NAME: km-client
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.BRANCH_PROD }}
+          token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
+
+      - name: Get the latest commit SHA of the repository
+        id: get-sha
+        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+
+      - name: Get current date
+        id: current-date
+        run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: pnpm Install
+        run: pnpm install
+
+      - name: Build
+        run: NODE_OPTIONS="--max-old-space-size=8192" pnpm client:build
+
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          build-args: CHAT_PUBLIC_PATH=https://${{vars.ALI_OSS_ENDPOINT}}/prod/cloudladder-wf-chat/${{ steps.get-sha.outputs.sha }}
+          push: true
+          file: ./km.client.dockerfile
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Dev
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_ACCESS_KEY }}:${{ secrets.RANCHER_SECRET_KEY }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:staging:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
