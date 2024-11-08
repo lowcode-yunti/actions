@@ -9,7 +9,7 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-b7pbdlr5:p-tn6wn
+  RANCHER_PROJECT: c-m-brbzdfng:p-4f2bp
   RANCHER_DEPLOYMENT_NAME: km-client
 
 jobs:
