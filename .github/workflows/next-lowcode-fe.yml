@@ -22,7 +22,7 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
-          node-version: 18
+          node-version: 20
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
