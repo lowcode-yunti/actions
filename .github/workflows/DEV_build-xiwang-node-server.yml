@@ -10,7 +10,7 @@ env:
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: https://123.249.110.162:30177
   RANCHER_PROJECT: local:p-fb9kw
-  RANCHER_DEPLOYMENT_NAME: dev:node-server
+  RANCHER_DEPLOYMENT_NAME: dev:node-service
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: 'node-service'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/573169c4-e377-4b63-8e7f-7e410c3b8a6a'
