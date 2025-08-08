@@ -92,7 +92,7 @@ jobs:
       - name: post message
         uses: foxundermoon/feishu-action@v2
         with:
-          url: https://open.feishu.cn/open-apis/bot/v2/hook/19800291-b192-440e-b9e8-890450babc6f
+          url: ${{ env.FEISHU_URL }}
           msg_type: post
           content: |
             post:
