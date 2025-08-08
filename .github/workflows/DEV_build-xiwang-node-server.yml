@@ -44,7 +44,7 @@ jobs:
         with:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
-          token: ${{ secrets.ACTION_TOKEN }}
+          token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
