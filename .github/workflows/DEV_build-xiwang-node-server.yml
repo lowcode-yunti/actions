@@ -1,4 +1,4 @@
-name: DEV_build-admin-backend
+name: DEV_build-xiwang-node-server
 
 on:
   workflow_dispatch:
