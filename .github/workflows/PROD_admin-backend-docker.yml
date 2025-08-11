@@ -13,28 +13,25 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: post start message
+      - name: post message
         uses: foxundermoon/feishu-action@v2
         with:
-          url: https://open.feishu.cn/open-apis/bot/v2/hook/19800291-b192-440e-b9e8-890450babc6f
+          url: ${{ env.FEISHU_URL }}
           msg_type: post
           content: |
             post:
               zh_cn:
-                title: 开始发版-正式环境 python 后端
+                title: 开始发版-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}
                 content:
                 - - tag: text
                     un_escape: true
-                    text: '开始发版-正式环境 python 后端'
+                    text: '开始发版-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}'
                   - tag: a
                     text: 查看发版详情
-                    href: https://github.com/huachengrx/actions/actions/workflows/PROD_admin-backend-docker.yml
+                    href: ${{ env.FEISHU_ACTION_URL }}
                   - tag: a
-                    text: 查看rancher-web
-                    href: https://rancher-prod.22ies.com/dashboard/c/c-m-wr9z8wfl/explorer/apps.deployment/prod/admin-python-be
-                  - tag: a
-                    text: 查看rancher-scheduler
-                    href: https://rancher-prod.22ies.com/dashboard/c/c-m-wr9z8wfl/explorer/apps.deployment/prod/admin-python-scheduler
+                    text: 查看rancher-deployment
+                    href: ${{ env.FEISHU_RANCHER_URL}}
       - name: Checkout the repository
         uses: actions/checkout@v3
         with:
@@ -76,25 +73,22 @@ jobs:
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
   #          platforms: linux/amd64,linux/arm64
-      - name: post end message
+      - name: post message
         uses: foxundermoon/feishu-action@v2
         with:
-          url: https://open.feishu.cn/open-apis/bot/v2/hook/19800291-b192-440e-b9e8-890450babc6f
+          url: ${{ env.FEISHU_URL }}
           msg_type: post
           content: |
             post:
               zh_cn:
-                title: 完成发版-正式环境 python 后端
+                title: 发版完成-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}
                 content:
                 - - tag: text
                     un_escape: true
-                    text: '完成发版-正式环境 python 后端'
+                    text: '发版完成-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}'
                   - tag: a
                     text: 查看发版详情
-                    href: https://github.com/huachengrx/actions/actions/workflows/PROD_admin-backend-docker.yml
+                    href: ${{ env.FEISHU_ACTION_URL }}
                   - tag: a
-                    text: 查看rancher-web
-                    href: https://rancher-prod.22ies.com/dashboard/c/c-m-wr9z8wfl/explorer/apps.deployment/prod/admin-python-be
-                  - tag: a
-                    text: 查看rancher-scheduler
-                    href: https://rancher-prod.22ies.com/dashboard/c/c-m-wr9z8wfl/explorer/apps.deployment/prod/admin-python-scheduler
+                    text: 查看rancher-deployment
+                    href: ${{ env.FEISHU_RANCHER_URL}}
