@@ -9,7 +9,7 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-b7pbdlr5:p-tn6wn
+  RANCHER_PROJECT: c-m-brbzdfng:p-4f2bp
   RANCHER_DEPLOYMENT_NAME: next-lowcode-fe
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
-          node-version: 18
+          node-version: 20
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -36,7 +36,7 @@ jobs:
         name: Install pnpm
         with:
           run_install: false
-          version: 9
+          version: 10.4.0
 
       - name: Get pnpm store directory
         shell: bash
