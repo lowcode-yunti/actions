@@ -1,0 +1,133 @@
+name: DEV_build-report
+
+on:
+  workflow_dispatch:
+env:
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}report
+  REPOSITORY: 'huachengrx/report'
+  BRANCH_PROD: dev
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_HEYUAN }}
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
+  RANCHER_PROJECT: c-m-qjl5cqb6:p-h97w4
+  RANCHER_DEPLOYMENT_NAME: develop:report
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: post message
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: https://open.feishu.cn/open-apis/bot/v2/hook/19800291-b192-440e-b9e8-890450babc6f
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: 开始发版-开发环境 report
+                content:
+                - - tag: text
+                    un_escape: true
+                    text: '开始发版-开发环境 report'
+                  - tag: a
+                    text: 查看发版详情
+                    href: https://github.com/huachengrx/actions/actions/workflows/DEV_report-docker.yml
+                  - tag: a
+                    text: 查看rancher-deployment
+                    href: https://rancher-prod.22ies.com/dashboard/c/c-m-qjl5cqb6/explorer/apps.deployment/develop/report
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.BRANCH_PROD }}
+          token: ${{ secrets.ACTION_TOKEN }}
+          node-version: 20
+
+      - name: Get the latest commit SHA of the repository
+        id: get-sha
+        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+
+      - name: Get current date
+        id: current-date
+        run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+        
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+#          version: 10.4.0
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: pnpm Install
+        run: pnpm install
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
+          push: true
+          file: ./Dockerfile
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+  #          platforms: linux/amd64,linux/arm64
+
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Dev
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
+      - name: post message
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: https://open.feishu.cn/open-apis/bot/v2/hook/19800291-b192-440e-b9e8-890450babc6f
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: 发版完成-开发环境 report
+                content:
+                - - tag: text
+                    un_escape: true
+                    text: '发版完成-开发环境 report'
+                  - tag: a
+                    text: 查看发版详情
+                    href: https://github.com/huachengrx/actions/actions/workflows/DEV_report-docker.yml
+                  - tag: a
+                    text: 查看rancher-deployment
+                    href: https://rancher-prod.22ies.com/dashboard/c/c-m-qjl5cqb6/explorer/apps.deployment/develop/report
