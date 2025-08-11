@@ -15,7 +15,7 @@ env:
   FEISHU_PROJECT_NAME: '管理后台-后端'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_admin-backend-docker.yml'
-  FEISHU_RANCHER_URL: 'https://rancher.cloudladder.net.cn/dashboard/c/c-m-brbzdfng/explorer/apps.deployment/dev/admin-python-be#pods'
+  FEISHU_RANCHER_URL: 'https://rancher.cloudladder.net.cn/dashboard/c/c-m-brbzdfng/explorer/apps.deployment/dev/admin-python-be'
 
 jobs:
   build-and-push:
