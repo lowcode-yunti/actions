@@ -9,13 +9,13 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-brbzdfng:p-4f2bp
-  RANCHER_DEPLOYMENT_NAME: dev:admin-fe
+  RANCHER_PROJECT: local:p-rmf5m
+  RANCHER_DEPLOYMENT_NAME: develop:admin-fe
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: '管理后台-前端'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_admin-frontend-docker.yml'
-  FEISHU_RANCHER_URL: 'https://rancher.cloudladder.net.cn/dashboard/c/c-m-brbzdfng/explorer/apps.deployment/dev/admin-fe'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/admin-fe#pods'
 
 jobs:
   build-and-push:

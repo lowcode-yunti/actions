@@ -9,13 +9,13 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-brbzdfng:p-4f2bp
+  RANCHER_PROJECT: local:p-rmf5m
   RANCHER_DEPLOYMENT_NAME: develop:report
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: 'report'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_report-docker.yml'
-  FEISHU_RANCHER_URL: 'https://r.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/develop/report#pods'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/report#pods'
 
 jobs:
   build-and-push:

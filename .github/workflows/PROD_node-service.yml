@@ -4,10 +4,17 @@ on:
   workflow_dispatch:
 env:
   DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}node-service
-  REPOSITORY: 'huachengrx/node-service'
-  BRANCH_PROD: main
-  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_HEYUAN }}
+  REPOSITORY: 'lowcode-yunti/node-service'
+  BRANCH_PROD: dev
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
+  FEISHU_ENV_NAME: '正式环境'
+  FEISHU_PROJECT_NAME: 'node-service'
+  FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/PROD_node-service.yml'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/node-service#pods'
+  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/node-worker#pods'
 
 jobs:
   build-and-push:

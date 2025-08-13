@@ -9,14 +9,15 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-brbzdfng:p-4f2bp
-  RANCHER_DEPLOYMENT_NAME: dev:node-service
-  RANCHER_DEPLOYMENT_NAME_WORKER: dev:node-worker
+  RANCHER_PROJECT: local:p-rmf5m
+  RANCHER_DEPLOYMENT_NAME: develop:node-service
+  RANCHER_DEPLOYMENT_NAME_WORKER: develop:node-worker
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: 'node-service'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_node-service.yml'
-  FEISHU_RANCHER_URL: 'https://rancher.cloudladder.net.cn/dashboard/c/c-m-brbzdfng/explorer/apps.deployment/dev/node-service'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/node-service#pods'
+  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/node-worker#pods'
 
 jobs:
   build-and-push:
@@ -43,7 +44,7 @@ jobs:
                     href: ${{ env.FEISHU_RANCHER_URL}}
                   - tag: a
                     text: 查看rancher-deployment-worker
-                    href: https://rancher.cloudladder.net.cn/dashboard/c/c-m-brbzdfng/explorer/apps.deployment/dev/node-worker
+                    href: ${{ env.FEISHU_RANCHER_URL1}}
       - name: Checkout the repository
         uses: actions/checkout@v3
         with:
@@ -121,4 +122,4 @@ jobs:
                     href: ${{ env.FEISHU_RANCHER_URL}}
                   - tag: a
                     text: 查看rancher-deployment-worker
-                    href: https://rancher.cloudladder.net.cn/dashboard/c/c-m-brbzdfng/explorer/apps.deployment/dev/node-worker
+                    href: ${{ env.FEISHU_RANCHER_URL1}}
