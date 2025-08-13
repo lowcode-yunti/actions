@@ -39,6 +39,9 @@ jobs:
                   - tag: a
                     text: 查看rancher-deployment
                     href: ${{ env.FEISHU_RANCHER_URL}}
+                  - tag: a
+                    text: 查看rancher-deployment
+                    href: ${{ env.FEISHU_RANCHER_URL1}}
       - name: Checkout the repository
         uses: actions/checkout@v3
         with:
@@ -99,3 +102,6 @@ jobs:
                   - tag: a
                     text: 查看rancher-deployment
                     href: ${{ env.FEISHU_RANCHER_URL}}
+                  - tag: a
+                    text: 查看rancher-deployment
+                    href: ${{ env.FEISHU_RANCHER_URL1}}
