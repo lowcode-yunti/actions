@@ -15,7 +15,7 @@ env:
   FEISHU_PROJECT_NAME: '官网'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_build-website.yml'
-  FEISHU_RANCHER_URL: 'https://r.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/develop/website#pods'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/website#pods'
 
 jobs:
   build-and-push:

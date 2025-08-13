@@ -10,12 +10,12 @@ env:
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
   RANCHER_PROJECT: local:p-rmf5m
-  RANCHER_DEPLOYMENT_NAME: prod:website
+  RANCHER_DEPLOYMENT_NAME: develop:website
   FEISHU_ENV_NAME: '正式环境'
   FEISHU_PROJECT_NAME: '官网'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_build-website.yml'
-  FEISHU_RANCHER_URL: 'https://r.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/prod/website#pods'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/website#pods'
 
 jobs:
   build-and-push:
