@@ -4,13 +4,18 @@ on:
   workflow_dispatch:
 env:
   DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}ragflow-wrap
-  REPOSITORY: 'huachengrx/ragflow-wrap'
+  REPOSITORY: 'lowcode-yunti/ragflow-wrap'
   BRANCH_PROD: dev
-  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_HEYUAN }}
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: c-m-qjl5cqb6:p-h97w4
-  RANCHER_DEPLOYMENT_NAME: develop:ragflow-server
+  RANCHER_PROJECT: c-m-brbzdfng:p-4f2bp
+  RANCHER_DEPLOYMENT_NAME: dev:ragflow-wrap
+  FEISHU_ENV_NAME: '开发环境'
+  FEISHU_PROJECT_NAME: 'ragflow-wrap'
+  FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_ragflow.yml'
+  FEISHU_RANCHER_URL: 'https://r.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/develop/ragflow-server'
 
 jobs:
   build-and-push:
