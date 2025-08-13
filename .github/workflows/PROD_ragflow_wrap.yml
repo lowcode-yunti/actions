@@ -13,7 +13,9 @@ env:
   FEISHU_PROJECT_NAME: 'ragflow-wrap'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/PROD_ragflow_wrap.yml'
-  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/ragflow-wrap#pods'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/ragflow-server#pods'
+  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/ragflow-worker#pods'
+
 
 jobs:
   build-and-push:
@@ -36,8 +38,11 @@ jobs:
                     text: 查看发版详情
                     href: ${{ env.FEISHU_ACTION_URL }}
                   - tag: a
-                    text: 查看rancher-deployment
+                    text: 查看rancher-service
                     href: ${{ env.FEISHU_RANCHER_URL}}
+                  - tag: a
+                    text: 查看rancher-worker
+                    href: ${{ env.FEISHU_RANCHER_URL1}}
       - name: Checkout the repository
         uses: actions/checkout@v3
         with:
@@ -102,5 +107,8 @@ jobs:
                     text: 查看发版详情
                     href: ${{ env.FEISHU_ACTION_URL }}
                   - tag: a
-                    text: 查看rancher-deployment
+                    text: 查看rancher-service
                     href: ${{ env.FEISHU_RANCHER_URL}}
+                  - tag: a
+                    text: 查看rancher-worker
+                    href: ${{ env.FEISHU_RANCHER_URL1}}
