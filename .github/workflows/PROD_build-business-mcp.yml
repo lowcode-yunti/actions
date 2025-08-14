@@ -4,10 +4,16 @@ on:
   workflow_dispatch:
 env:
   DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}business-mcp
-  REPOSITORY: 'huachengrx/business-mcp'
+  REPOSITORY: 'lowcode/business-mcp'
   BRANCH_PROD: main
-  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_HEYUAN }}
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  FEISHU_ENV_NAME: '正式环境'
+  FEISHU_PROJECT_NAME: 'MCP-SERVICE'
+  FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/PROD_build-business-mcp.yml'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/business-mcp#pods'
+  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/business-mcp#pods'
 
 jobs:
   build-and-push:
