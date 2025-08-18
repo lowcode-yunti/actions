@@ -79,7 +79,7 @@ jobs:
           context: .
           build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          file: ./docker/Dockerfile
+          file: .Dockerfile
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
