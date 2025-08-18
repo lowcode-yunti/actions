@@ -10,14 +10,14 @@ env:
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
   RANCHER_PROJECT: local:p-rmf5m
-  RANCHER_DEPLOYMENT_NAME: develop:suna-service
-  RANCHER_DEPLOYMENT_NAME1: develop:suna-workder
+  RANCHER_DEPLOYMENT_NAME: develop:suna-backend
+  RANCHER_DEPLOYMENT_NAME1: develop:suna-worker
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: 'figure-后端'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_build_figure_backend.yml'
-  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/suna-service'
-  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/suna-workder'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/suna-backend'
+  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/suna-worker'
 
 jobs:
   build-and-push:
