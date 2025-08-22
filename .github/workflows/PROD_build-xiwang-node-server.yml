@@ -12,6 +12,7 @@ env:
   FEISHU_PROJECT_NAME: 'node-service'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/573169c4-e377-4b63-8e7f-7e410c3b8a6a'
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/PROD_build-xiwang-node-server.yml'
+  FEISHU_RANCHER_URL: 'https://123.249.110.162:30177/dashboard/c/local/explorer/apps.deployment/prod/node-service'
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
