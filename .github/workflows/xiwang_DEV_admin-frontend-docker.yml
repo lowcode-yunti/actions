@@ -14,9 +14,9 @@ env:
   RANCHER_DEPLOYMENT_NAME: develop:admin-fe
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: '管理后台-前端'
-  FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_admin-frontend-docker.yml'
-  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/admin-fe#pods'
+  FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/573169c4-e377-4b63-8e7f-7e410c3b8a6a'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/xiwang_DEV_build-xiwang-node-server.yml'
+  FEISHU_RANCHER_URL: 'https://123.249.110.162:30177/dashboard/c/local/explorer/apps.deployment/dev/node-service'
 
 jobs:
   build-and-push:
