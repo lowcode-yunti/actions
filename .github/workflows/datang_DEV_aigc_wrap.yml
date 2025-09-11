@@ -3,7 +3,7 @@ name: datang_DEV_build-aigc-wrap
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: registry.cn-shanghai.aliyuncs.com/deploy_image/aigc
+  DOCKER_IMAGE: deploy_image/aigc
   REPOSITORY: 'lowcode-yunti/ragflow-wrap'
   BRANCH_PROD: datang/dev
   BRANCH_TAG: datang_dev
