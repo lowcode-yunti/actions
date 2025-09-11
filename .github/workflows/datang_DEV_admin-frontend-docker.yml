@@ -1,19 +1,19 @@
-name: datang_DEV_build-website
+name: datang_DEV_build-admin-frontend
 
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: deploy_image/website
-  REPOSITORY: 'lowcode-yunti/website'
+  DOCKER_IMAGE: deploy_image/admin-frontend
+  REPOSITORY: 'lowcode-yunti/admin-frontend'
   BRANCH_PROD: datang/dev
   BRANCH_TAG: datang_dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   FEISHU_ENV_NAME: '开发环境'
-  FEISHU_PROJECT_NAME: '官网'
+  FEISHU_PROJECT_NAME: '管理后台-前端'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/2c290b29-cbc1-479b-a6a7-f9179537b2e4'
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_build-website.yml'
-  FEISHU_RANCHER_URL: 'https://10.126.126.3:4443/dashboard/c/local/explorer/apps.deployment/develop/website#pods'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_admin-frontend-docker.yml'
+  FEISHU_RANCHER_URL: 'https://10.126.126.3:4443/dashboard/c/local/explorer/apps.deployment/develop/admin-fe#pods'
 
 jobs:
   build-and-push:
@@ -44,7 +44,6 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.ACTION_TOKEN }}
-          node-version: 20
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -53,30 +52,29 @@ jobs:
       - name: Get current date
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-          run_install: false
-          version: 10.12.1
+        
+      - uses: actions/setup-node@v4.2.0
+        name: Install npm
 
 
       - name: Get pnpm store directory
         shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+          echo "STORE_PATH=$(npm config get cache)" >> $GITHUB_ENV
+          
       - uses: actions/cache@v4
-        name: Setup pnpm cache
+        name: Setup npm cache
         with:
           path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-npm-store-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-      - name: pnpm Install
-        run: pnpm install
+            ${{ runner.os }}-npm-store-
+      - name: npm Install
+        run: npm install --force
 
       - name: Build
-        run: pnpm run build:dev
-        
+        run: npm run build:dev
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -96,7 +94,7 @@ jobs:
           context: .
           build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}-${{ steps.current-date.outputs.date }}
