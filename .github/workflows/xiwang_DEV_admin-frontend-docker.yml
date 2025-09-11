@@ -9,15 +9,14 @@ env:
   BRANCH_TAG: xiwang_dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
-  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
-  RANCHER_PROJECT: local:p-rmf5m
-  RANCHER_DEPLOYMENT_NAME: develop:admin-fe
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: '管理后台-前端'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/573169c4-e377-4b63-8e7f-7e410c3b8a6a'
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/xiwang_DEV_build-xiwang-node-server.yml'
   FEISHU_RANCHER_URL: 'https://123.249.110.162:30177/dashboard/c/local/explorer/apps.deployment/dev/node-service'
-
+  RANCHER_API_ENDPOINT: https://123.249.110.162:30177
+  RANCHER_PROJECT: local:p-fb9kw
+  RANCHER_DEPLOYMENT_NAME: dev:admin-fe
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
