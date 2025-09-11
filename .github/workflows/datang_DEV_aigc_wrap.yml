@@ -1,19 +1,21 @@
-name: PROD_build-business-mcp
+name: datang_DEV_build-aigc-wrap
 
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}business-mcp
-  REPOSITORY: 'lowcode-yunti/business-mcp'
-  BRANCH_PROD: main
+  DOCKER_IMAGE: registry.cn-shanghai.aliyuncs.com/deploy_image/aigc
+  REPOSITORY: 'lowcode-yunti/ragflow-wrap'
+  BRANCH_PROD: datang/dev
+  BRANCH_TAG: datang_dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
-  FEISHU_ENV_NAME: '正式环境'
-  FEISHU_PROJECT_NAME: 'business-mcp'
-  FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/PROD_build-business-mcp.yml'
-  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/business-mcp#pods'
-  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/business-mcp#pods'
+  FEISHU_ENV_NAME: '测试环境'
+  FEISHU_PROJECT_NAME: 'aigc'
+  FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/2c290b29-cbc1-479b-a6a7-f9179537b2e4'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_aigc_wrap.yml'
+  FEISHU_RANCHER_URL: 'https://10.126.126.3:4443/dashboard/c/local/explorer/apps.deployment/develop/aigc-server#pods'
+  FEISHU_RANCHER_URL1: 'https://10.126.126.3:4443/dashboard/c/local/explorer/apps.deployment/develop/aigc-worker#pods'
+
 
 jobs:
   build-and-push:
@@ -36,14 +38,18 @@ jobs:
                     text: 查看发版详情
                     href: ${{ env.FEISHU_ACTION_URL }}
                   - tag: a
-                    text: 查看rancher-deployment
+                    text: 查看rancher-service
                     href: ${{ env.FEISHU_RANCHER_URL}}
+                  - tag: a
+                    text: 查看rancher-worker
+                    href: ${{ env.FEISHU_RANCHER_URL1}}
       - name: Checkout the repository
         uses: actions/checkout@v3
         with:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.ACTION_TOKEN }}
+          node-version: 20
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -72,13 +78,18 @@ jobs:
           context: .
           build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          file: ./docker/Dockerfile
+          file: ./Dockerfile
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-  #          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
+
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
       - name: post message
         uses: foxundermoon/feishu-action@v2
         with:
@@ -96,5 +107,8 @@ jobs:
                     text: 查看发版详情
                     href: ${{ env.FEISHU_ACTION_URL }}
                   - tag: a
-                    text: 查看rancher-deployment
+                    text: 查看rancher-service
                     href: ${{ env.FEISHU_RANCHER_URL}}
+                  - tag: a
+                    text: 查看rancher-worker
+                    href: ${{ env.FEISHU_RANCHER_URL1}}

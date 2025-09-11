@@ -1,19 +1,21 @@
-name: PROD_build-business-mcp
+name: DEV_build_figure_frontend
 
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}business-mcp
-  REPOSITORY: 'lowcode-yunti/business-mcp'
-  BRANCH_PROD: main
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}figure_frontend
+  REPOSITORY: 'lowcode-yunti/figure-frontend'
+  BRANCH_PROD: dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
-  FEISHU_ENV_NAME: '正式环境'
-  FEISHU_PROJECT_NAME: 'business-mcp'
+  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
+  RANCHER_PROJECT: local:p-rmf5m
+  RANCHER_DEPLOYMENT_NAME: develop:suna-frontend
+  FEISHU_ENV_NAME: '开发环境'
+  FEISHU_PROJECT_NAME: 'figure-前端'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/PROD_build-business-mcp.yml'
-  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/business-mcp#pods'
-  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/business-mcp#pods'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_build_figure_frontend.yml'
+  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/suna-frontend'
 
 jobs:
   build-and-push:
@@ -52,7 +54,7 @@ jobs:
       - name: Get current date
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
-
+        
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -70,15 +72,29 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          file: ./docker/Dockerfile
+          file: Dockerfile
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
   #          platforms: linux/amd64,linux/arm64
+
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Service
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
+      - name: Deploy Workder
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME1 }}?action=redeploy"
       - name: post message
         uses: foxundermoon/feishu-action@v2
         with:

@@ -1,20 +1,18 @@
-name: PROD_build-business-mcp
+name: PROD_build-xiwang-node-server
 
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}business-mcp
-  REPOSITORY: 'lowcode-yunti/business-mcp'
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}xiwang-node-server
+  REPOSITORY: 'lowcode-yunti/xiwang-node-server'
   BRANCH_PROD: main
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
-  FEISHU_ENV_NAME: '正式环境'
-  FEISHU_PROJECT_NAME: 'business-mcp'
-  FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/PROD_build-business-mcp.yml'
-  FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/business-mcp#pods'
-  FEISHU_RANCHER_URL1: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/prod/business-mcp#pods'
-
+  FEISHU_ENV_NAME: '生产环境'
+  FEISHU_PROJECT_NAME: 'node-service'
+  FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/573169c4-e377-4b63-8e7f-7e410c3b8a6a'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/PROD_build-xiwang-node-server.yml'
+  FEISHU_RANCHER_URL: 'https://123.249.110.162:30177/dashboard/c/local/explorer/apps.deployment/prod/node-service'
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -43,7 +41,7 @@ jobs:
         with:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
-          token: ${{ secrets.ACTION_TOKEN }}
+          token: ${{ secrets.CLOUD_LADDER_DISPATCH }}
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -72,13 +70,18 @@ jobs:
           context: .
           build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          file: ./docker/Dockerfile
+          file: ./Dockerfile
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
   #          platforms: linux/amd64,linux/arm64
+
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
       - name: post message
         uses: foxundermoon/feishu-action@v2
         with:
