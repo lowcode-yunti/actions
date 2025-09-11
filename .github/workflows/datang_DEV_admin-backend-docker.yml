@@ -1,4 +1,4 @@
-name: DEV_build-admin-backend
+name: datang_DEV_build-admin-backend
 
 on:
   workflow_dispatch:
