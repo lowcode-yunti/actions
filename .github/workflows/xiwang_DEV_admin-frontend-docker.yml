@@ -13,7 +13,7 @@ env:
   FEISHU_PROJECT_NAME: '管理后台-前端'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/573169c4-e377-4b63-8e7f-7e410c3b8a6a'
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/xiwang_DEV_build-xiwang-node-server.yml'
-  FEISHU_RANCHER_URL: 'https://r.dev.xurifukangngo.com/dashboard/c/local/explorer/apps.deployment/dev/node-service'
+  FEISHU_RANCHER_URL: 'https://r.dev.xurifukangngo.com/dashboard/c/local/explorer/apps.deployment/dev/admin-fe'
   RANCHER_API_ENDPOINT: https://r.dev.xurifukangngo.com
   RANCHER_PROJECT: local:p-fb9kw
   RANCHER_DEPLOYMENT_NAME: dev:admin-fe
