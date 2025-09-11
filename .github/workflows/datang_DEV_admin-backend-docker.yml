@@ -73,7 +73,7 @@ jobs:
           images: ${{ env.DOCKER_IMAGE }}
 
       - name: Build and push Docker image
-        uses: docker/docker/build-push-action@v5
+        uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
