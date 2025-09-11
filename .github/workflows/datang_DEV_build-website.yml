@@ -1,19 +1,19 @@
-name: datang_DEV_build-admin-backend
+name: datang_DEV_build-website
 
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: deploy_image/admin-backend
-  REPOSITORY: 'lowcode-yunti/admin-backend'
+  DOCKER_IMAGE: deploy_image/website
+  REPOSITORY: 'lowcode-yunti/website'
   BRANCH_PROD: datang/dev
   BRANCH_TAG: datang_dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   FEISHU_ENV_NAME: '开发环境'
-  FEISHU_PROJECT_NAME: '管理后台-后端'
+  FEISHU_PROJECT_NAME: '官网'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/2c290b29-cbc1-479b-a6a7-f9179537b2e4'
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_admin-backend-docker.yml'
-  FEISHU_RANCHER_URL: 'https://10.126.126.3:4443/dashboard/c/local/explorer/apps.deployment/develop/admin_python_be#pods'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_build-website.yml'
+  FEISHU_RANCHER_URL: 'https://10.126.126.3:4443/dashboard/c/local/explorer/apps.deployment/develop/admin_fe#pods'
 
 jobs:
   build-and-push:
@@ -44,6 +44,7 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           ref: ${{ env.BRANCH_PROD }}
           token: ${{ secrets.ACTION_TOKEN }}
+          node-version: 20
 
       - name: Get the latest commit SHA of the repository
         id: get-sha
@@ -52,7 +53,30 @@ jobs:
       - name: Get current date
         id: current-date
         run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+          version: 10.12.1
 
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+      - name: pnpm Install
+        run: pnpm install
+
+      - name: Build
+        run: pnpm run build:dev
+        
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -72,7 +96,7 @@ jobs:
           context: .
           build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
           push: true
-          file: ./docker/Dockerfile
+          file: ./Dockerfile
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}-${{ steps.current-date.outputs.date }}
