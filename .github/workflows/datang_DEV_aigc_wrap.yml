@@ -1,4 +1,4 @@
-name: datang_DEV_build-ragflow-wrap
+name: datang_DEV_build-aigc-wrap
 
 on:
   workflow_dispatch:
@@ -10,9 +10,9 @@ env:
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   FEISHU_ENV_NAME: '测试环境'
-  FEISHU_PROJECT_NAME: 'ragflow-wrap'
+  FEISHU_PROJECT_NAME: 'aigc'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/2c290b29-cbc1-479b-a6a7-f9179537b2e4'
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_ragflow_wrap.yml'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_aigc_wrap.yml'
   FEISHU_RANCHER_URL: 'https://10.126.126.3:4443/dashboard/c/local/explorer/apps.deployment/develop/aigc-server#pods'
   FEISHU_RANCHER_URL1: 'https://10.126.126.3:4443/dashboard/c/local/explorer/apps.deployment/develop/aigc-worker#pods'
 
