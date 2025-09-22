@@ -81,7 +81,7 @@ jobs:
           push: true
           file: ./docker/Dockerfile.base
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/python:3.11.11-base
+            ${{ env.DOCKER_REGISTRY }}/deploy_image/python:3.11.11-base
           labels: ${{ steps.meta.outputs.labels }}
 
   dispatch-deploy:
