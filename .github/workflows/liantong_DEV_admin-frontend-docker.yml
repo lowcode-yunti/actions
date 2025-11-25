@@ -9,8 +9,9 @@ env:
   BRANCH_TAG: lianting_dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
   RANCHER_PROJECT: local:p-rmf5m
-  RANCHER_DEPLOYMENT_NAME: lt:admin-python-be
+  RANCHER_DEPLOYMENT_NAME: lt:admin-fe
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: '管理后台-前端'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/0dedd91f-3a34-4e27-b641-56d4d903bafa'
