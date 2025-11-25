@@ -100,7 +100,6 @@ jobs:
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/arm64
 
   dispatch-deploy:
     needs: build-and-push
