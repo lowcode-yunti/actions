@@ -1,0 +1,120 @@
+name: liantong_DEV_build-node-service-arm
+
+on:
+  workflow_dispatch:
+env:
+  DOCKER_IMAGE: deploy_image/node-service
+  REPOSITORY: 'lowcode-yunti/liantong-node-services'
+  BRANCH_PROD: dev
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  RANCHER_API_ENDPOINT: 'https://r.l.cloudladder.net.cn'
+  RANCHER_PROJECT: local:p-7xk8z
+  RANCHER_DEPLOYMENT_NAME: lt:node-service
+  FEISHU_ENV_NAME: '开发环境'
+  FEISHU_PROJECT_NAME: 'node-service'
+  FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/0dedd91f-3a34-4e27-b641-56d4d903bafa'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/liantong_DEV_admin-backend-docker-arm.yml'
+  FEISHU_RANCHER_URL: 'https://r.l.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/lt/node-service#pods'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: post message
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: ${{ env.FEISHU_URL }}
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: 开始发版-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}
+                content:
+                - - tag: text
+                    un_escape: true
+                    text: '开始发版-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}'
+                  - tag: a
+                    text: 查看发版详情
+                    href: ${{ env.FEISHU_ACTION_URL }}
+                  - tag: a
+                    text: 查看rancher-deployment
+                    href: ${{ env.FEISHU_RANCHER_URL}}
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.BRANCH_PROD }}
+          token: ${{ secrets.ACTION_TOKEN }}
+          node-version: 20
+
+      - name: Get the latest commit SHA of the repository
+        id: get-sha
+        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+
+      - name: Get current date
+        id: current-date
+        run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          file: ./Dockerfile
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_PROD }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/arm64
+
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Service
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy" &
+      - name: Deploy Worker
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME_WORKER }}?action=redeploy"
+      - name: post message
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: ${{ env.FEISHU_URL }}
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: 发版完成-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}
+                content:
+                - - tag: text
+                    un_escape: true
+                    text: '发版完成-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}'
+                  - tag: a
+                    text: 查看发版详情
+                    href: ${{ env.FEISHU_ACTION_URL }}
+                  - tag: a
+                    text: 查看rancher-deployment-service
+                    href: ${{ env.FEISHU_RANCHER_URL}}
+                  - tag: a
+                    text: 查看rancher-deployment-worker
+                    href: ${{ env.FEISHU_RANCHER_URL1}}
