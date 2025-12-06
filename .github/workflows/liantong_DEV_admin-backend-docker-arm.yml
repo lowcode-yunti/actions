@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 env:
   DOCKER_IMAGE: deploy_image/admin-backend
-  REPOSITORY: 'lowcode-yunti/admin-backend'
+  REPOSITORY: 'lowcode-yunti/admin-backend-arm'
   BRANCH_PROD: liantong/dev
   BRANCH_TAG: liantong_dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}

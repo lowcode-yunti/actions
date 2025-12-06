@@ -3,7 +3,7 @@ name: liantong_DEV_build-admin-frontend-arm
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: deploy_image/admin-frontend
+  DOCKER_IMAGE: deploy_image/admin-frontend-arm
   REPOSITORY: 'lowcode-yunti/admin-frontend'
   BRANCH_PROD: liantong/dev
   BRANCH_TAG: liantong_dev

@@ -3,7 +3,7 @@ name: liantong-DEV_build_figure_frontend-arm
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: deploy_image/figure_frontend
+  DOCKER_IMAGE: deploy_image/figure_frontend-arm
   REPOSITORY: 'lowcode-yunti/figure-frontend'
   BRANCH_PROD: liantong/dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
