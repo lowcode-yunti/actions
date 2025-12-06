@@ -3,10 +3,10 @@ name: liantong_DEV_build-admin-frontend-arm
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: deploy_image/admin-frontend-arm
+  DOCKER_IMAGE: deploy_image/admin-frontend
   REPOSITORY: 'lowcode-yunti/admin-frontend'
   BRANCH_PROD: liantong/dev
-  BRANCH_TAG: liantong_dev
+  BRANCH_TAG: liantong_dev_arm
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: 'https://r.l.cloudladder.net.cn'
