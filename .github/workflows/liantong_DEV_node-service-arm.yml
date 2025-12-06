@@ -3,7 +3,7 @@ name: liantong_DEV_build-node-service-arm
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: deploy_image/node-service
+  DOCKER_IMAGE: deploy_image/node-service-arm
   REPOSITORY: 'lowcode-yunti/liantong-node-services'
   BRANCH_PROD: dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}

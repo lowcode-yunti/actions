@@ -3,8 +3,8 @@ name: liantong_DEV_build-admin-backend-arm
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: deploy_image/admin-backend
-  REPOSITORY: 'lowcode-yunti/admin-backend-arm'
+  DOCKER_IMAGE: deploy_image/admin-backend-arm
+  REPOSITORY: 'lowcode-yunti/admin-backend'
   BRANCH_PROD: liantong/dev
   BRANCH_TAG: liantong_dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
