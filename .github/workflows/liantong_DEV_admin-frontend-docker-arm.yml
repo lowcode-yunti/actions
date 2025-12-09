@@ -111,7 +111,7 @@ jobs:
       - name: Deploy Dev
         run: |
           curl -X POST \
-            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            -u "${{ secrets.LIANTONG_RANCHER_USER_PASS }}" \
             "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
       - name: post message
         uses: foxundermoon/feishu-action@v2

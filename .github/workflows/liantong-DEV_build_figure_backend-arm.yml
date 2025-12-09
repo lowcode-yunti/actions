@@ -11,14 +11,14 @@ env:
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: 'https://r.l.cloudladder.net.cn'
   RANCHER_PROJECT: local:p-7xk8z
-  RANCHER_DEPLOYMENT_NAME: prod:suna-backend
-  RANCHER_DEPLOYMENT_NAME1: prod:suna-worker
+  RANCHER_DEPLOYMENT_NAME: prod:tiga-backend
+  RANCHER_DEPLOYMENT_NAME1: prod:tiga-worker
   FEISHU_ENV_NAME: '开发环境-arm版'
   FEISHU_PROJECT_NAME: 'figure-后端'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/0dedd91f-3a34-4e27-b641-56d4d903bafa'
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/liantong-DEV_build-figure-backend-arm.yml'
-  FEISHU_RANCHER_URL: 'https://r.l.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/prod/suna-backend#pods'
-  FEISHU_RANCHER_URL1: 'https://r.l.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/prod/suna-backend#pods'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/liantong-DEV_build_figure_backend-arm.yml'
+  FEISHU_RANCHER_URL: 'https://r.l.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/prod/tiga-backend#pods'
+  FEISHU_RANCHER_URL1: 'https://r.l.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/prod/tiga-worker#pods'
 
 jobs:
   build-and-push:
@@ -97,12 +97,12 @@ jobs:
       - name: Deploy Service
         run: |
           curl -X POST \
-            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            -u "${{ secrets.LIANTONG_RANCHER_USER_PASS }}" \
             "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
       - name: Deploy Workder
         run: |
           curl -X POST \
-            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            -u "${{ secrets.LIANTONG_RANCHER_USER_PASS }}" \
             "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME1 }}?action=redeploy"
       - name: post message
         uses: foxundermoon/feishu-action@v2

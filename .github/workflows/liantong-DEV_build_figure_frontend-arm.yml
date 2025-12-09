@@ -15,8 +15,8 @@ env:
   FEISHU_ENV_NAME: '开发环境-arm'
   FEISHU_PROJECT_NAME: 'figure-前端'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/0dedd91f-3a34-4e27-b641-56d4d903bafa'
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/liantong-build_figure-frontend-arm.yml'
-  FEISHU_RANCHER_URL: 'https://r.l.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/prod/figure-frontend#pods'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/liantong-DEV_build_figure_frontend-arm.yml'
+  FEISHU_RANCHER_URL: 'https://r.l.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/prod/tiga-frontend#pods'
 
 jobs:
   build-and-push:
@@ -93,12 +93,12 @@ jobs:
       - name: Deploy Service
         run: |
           curl -X POST \
-            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            -u "${{ secrets.LIANTONG_RANCHER_USER_PASS }}" \
             "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
       - name: Deploy Workder
         run: |
           curl -X POST \
-            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            -u "${{ secrets.LIANTONG_RANCHER_USER_PASS }}" \
             "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME1 }}?action=redeploy"
       - name: post message
         uses: foxundermoon/feishu-action@v2
