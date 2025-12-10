@@ -11,7 +11,7 @@ env:
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   RANCHER_API_ENDPOINT: 'https://r.l.cloudladder.net.cn'
   RANCHER_PROJECT: local:p-7xk8z
-  RANCHER_DEPLOYMENT_NAME: prod:suna-frontend
+  RANCHER_DEPLOYMENT_NAME: prod:tiga-frontend
   FEISHU_ENV_NAME: '开发环境-arm'
   FEISHU_PROJECT_NAME: 'figure-前端'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/0dedd91f-3a34-4e27-b641-56d4d903bafa'
