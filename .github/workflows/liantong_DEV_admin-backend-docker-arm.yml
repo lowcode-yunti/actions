@@ -5,7 +5,7 @@ on:
 env:
   DOCKER_IMAGE: deploy_image/admin-backend
   REPOSITORY: 'lowcode-yunti/admin-backend'
-  BRANCH_PROD: liantong/dev
+  BRANCH_PROD: liantong/dev-arm
   BRANCH_TAG: liantong_dev_arm
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
