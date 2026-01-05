@@ -3,7 +3,7 @@ name: aigc-mcp-arm
 on:
   workflow_dispatch:
 env:
-  DOCKER_IMAGE: deploy_image/sandbox
+  DOCKER_IMAGE: deploy_image/aigc-mcp
   REPOSITORY: 'lowcode-yunti/mcp_server'
   BRANCH_PROD: main
   BRANCH_TAG: arm
