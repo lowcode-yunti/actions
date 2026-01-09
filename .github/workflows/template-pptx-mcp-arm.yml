@@ -1,4 +1,4 @@
-name: office-pptx-mcp-arm
+name: template-pptx-mcp-arm
 
 on:
   workflow_dispatch:
