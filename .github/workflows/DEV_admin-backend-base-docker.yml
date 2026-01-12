@@ -1,0 +1,93 @@
+name: DEV_build-admin-backend-base
+
+on:
+  workflow_dispatch:
+env:
+  DOCKER_IMAGE: ${{ vars.DOCKER_WORKSPACE }}admin-backend
+  REPOSITORY: 'lowcode-yunti/admin-backend'
+  BRANCH_PROD: dev
+  DOCKER_TAG: dev-base
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
+  RANCHER_PROJECT: local:p-rmf5m
+  RANCHER_DEPLOYMENT_NAME: develop:admin-python-be
+  FEISHU_ENV_NAME: '开发环境'
+  FEISHU_PROJECT_NAME: '管理后台-后端.base'
+  FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: post message
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: ${{ env.FEISHU_URL }}
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: 开始发版-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}
+                content:
+                - - tag: text
+                    un_escape: true
+                    text: '开始发版-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}'
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.BRANCH_PROD }}
+          token: ${{ secrets.ACTION_TOKEN }}
+
+      - name: Get the latest commit SHA of the repository
+        id: get-sha
+        run: echo "::set-output name=sha::$(git rev-parse HEAD)"
+
+      - name: Get current date
+        id: current-date
+        run: echo "::set-output name=date::$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          build-args: REACT_APP_COMMIT_ID=${{ steps.get-sha.outputs.sha }}
+          push: true
+          file: ./docker/Dockerfile.base
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+  #          platforms: linux/amd64,linux/arm64
+
+  dispatch-deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: post message
+        uses: foxundermoon/feishu-action@v2
+        with:
+          url: ${{ env.FEISHU_URL }}
+          msg_type: post
+          content: |
+            post:
+              zh_cn:
+                title: 发版完成-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}
+                content:
+                - - tag: text
+                    un_escape: true
+                    text: '发版完成-${{ env.FEISHU_ENV_NAME }} ${{ env.FEISHU_PROJECT_NAME }}'
