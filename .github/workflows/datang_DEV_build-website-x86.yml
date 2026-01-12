@@ -14,6 +14,9 @@ env:
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/15f055a9-cb38-49c5-9281-a38ef7e35bd9'
   FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_build-website-x86.yml'
   FEISHU_RANCHER_URL: 'https://r.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/develop/website#pods'
+  RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
+  RANCHER_PROJECT: local:p-rmf5m
+  RANCHER_DEPLOYMENT_NAME: develop:website
   # www.dev.cloudladder.net.cn
 jobs:
   build-and-push:
@@ -108,6 +111,11 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Deploy image
+        run: |
+          curl -X POST \
+            -u "${{ secrets.RANCHER_USER_PASS }}" \
+            "${{ env.RANCHER_API_ENDPOINT }}/v3/project/${{ env.RANCHER_PROJECT }}/workloads/deployment:${{ env.RANCHER_DEPLOYMENT_NAME }}?action=redeploy"
       - name: post message
         uses: foxundermoon/feishu-action@v2
         with:
