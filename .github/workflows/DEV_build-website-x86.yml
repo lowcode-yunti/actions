@@ -1,18 +1,18 @@
-name: datang_DEV_build-website-x86
+name: DEV_build-website-x86
 
 on:
   workflow_dispatch:
 env:
   DOCKER_IMAGE: deploy_image/website
   REPOSITORY: 'lowcode-yunti/website'
-  BRANCH_PROD: datang/dev
-  BRANCH_TAG: datang_dev_x86
+  BRANCH_PROD: liantong/monorepo
+  BRANCH_TAG: dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: '官网'
   FEISHU_URL: 'https://open.feishu.cn/open-apis/bot/v2/hook/15f055a9-cb38-49c5-9281-a38ef7e35bd9'
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/datang_DEV_build-website-x86.yml'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/DEV_build-website-x86.yml'
   FEISHU_RANCHER_URL: 'https://r.cloudladder.net.cn/dashboard/c/local/explorer/apps.deployment/develop/website#pods'
   RANCHER_API_ENDPOINT: ${{ secrets.RANCHER_API_ENDPOINT }}
   RANCHER_PROJECT: local:p-rmf5m
