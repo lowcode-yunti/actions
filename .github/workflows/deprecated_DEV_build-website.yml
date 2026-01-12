@@ -1,4 +1,4 @@
-name: DEV_build-website
+name: deprecated_DEV_build-website
 
 on:
   workflow_dispatch:
