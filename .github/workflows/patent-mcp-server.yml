@@ -5,7 +5,7 @@ on:
 env:
   DOCKER_IMAGE: deploy_image/patent-mcp-server
   REPOSITORY: 'lowcode-yunti/patent-mcp-server'
-  BRANCH_PROD: main
+  BRANCH_PROD: master
   BRANCH_TAG: arm
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
