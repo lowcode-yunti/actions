@@ -6,7 +6,7 @@ env:
   DOCKER_IMAGE: deploy_image/pandoc-server
   REPOSITORY: 'lowcode-yunti/pandoc-server'
   BRANCH_PROD: main
-  BRANCH_TAG: arm
+  BRANCH_TAG: latest
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
