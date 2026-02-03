@@ -1,4 +1,4 @@
-name: liantong-DEV_build_sandbox-arm
+name: build_sandbox-arm
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ env:
   DOCKER_IMAGE: deploy_image/sandbox
   REPOSITORY: 'lowcode-yunti/sandbox_v1'
   BRANCH_PROD: main
-  BRANCH_TAG: arm
+  BRANCH_TAG: latest
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
@@ -51,7 +51,7 @@ jobs:
           context: .
           platforms: linux/arm64
           push: true
-          file: Dockerfile
+          file: Dockerfile.arm
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.BRANCH_TAG }}-${{ steps.current-date.outputs.date }}
