@@ -15,7 +15,7 @@ env:
   FEISHU_ENV_NAME: '开发环境'
   FEISHU_PROJECT_NAME: 'drawnix'
   FEISHU_URL: ${{vars.FEISHU_YUNTI_URL}}
-  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/shangyun/build-drawnix.yml'
+  FEISHU_ACTION_URL: 'https://github.com/lowcode-yunti/actions/actions/workflows/build-drawnix.yml'
   FEISHU_RANCHER_URL: '${{ secrets.RANCHER_API_ENDPOINT }}/dashboard/c/local/explorer/apps.deployment/develop/drawnix#pods'
 
 
