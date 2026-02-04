@@ -6,7 +6,7 @@ env:
   DOCKER_IMAGE: deploy_image/sandbox
   REPOSITORY: 'lowcode-yunti/sandbox_v1'
   BRANCH_PROD: main
-  BRANCH_TAG: arm-latest
+  BRANCH_TAG: arm
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
