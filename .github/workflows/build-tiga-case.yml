@@ -6,7 +6,7 @@ on:
 env:
   DOCKER_IMAGE: deploy_image/tiga-case
   REPOSITORY: 'lowcode-yunti/tiga-case'
-  BRANCH_NAME: main
+  BRANCH_NAME: dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
