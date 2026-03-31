@@ -1,4 +1,4 @@
-name: build-tiga-case
+name: prod-backend-tiga-case
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ env:
   DOCKER_IMAGE: deploy_image/tiga-case
   REPOSITORY: 'lowcode-yunti/tiga-case'
   BRANCH_NAME: dev
+  TAG_NAME: main
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
@@ -49,18 +50,7 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ env.BRANCH_NAME }}
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ env.BRANCH_NAME }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ env.TAG_NAME }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ env.TAG_NAME }}-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ steps.get-sha.outputs.sha }}
-          labels: ${{ steps.meta.outputs.labels }}
-      - name: Build and push frontend Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.BRANCH_NAME }}
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.BRANCH_NAME }}-${{ steps.current-date.outputs.date }}
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
