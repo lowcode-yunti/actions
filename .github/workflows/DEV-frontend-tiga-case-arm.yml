@@ -6,7 +6,8 @@ on:
 env:
   DOCKER_IMAGE: deploy_image/tiga-case
   REPOSITORY: 'lowcode-yunti/tiga-case'
-  BRANCH_NAME: dev
+  TAG: dev
+  BRANCH_NAME: yimu-dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
@@ -53,7 +54,7 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.BRANCH_NAME }}-arm
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.BRANCH_NAME }}-arm-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.TAG }}-arm
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.TAG }}-arm-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
