@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKER_IMAGE: deploy_image/tiga-case
+  DOCKER_IMAGE: cloudladder_public/tiga-case
   REPOSITORY: 'lowcode-yunti/tiga-case'
   BRANCH_NAME: dev-cython
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
