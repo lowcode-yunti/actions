@@ -1,4 +1,4 @@
-name: DEV-backend-tiga-case-arm
+name: build-semantica
 
 on:
   workflow_dispatch:
