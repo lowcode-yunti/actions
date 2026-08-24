@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKER_IMAGE: deploy_image/tiga-case
-  REPOSITORY: 'semantica-agi/semantica'
+  DOCKER_IMAGE: deploy_image/semantica
+  REPOSITORY: 'lowcode-yunti/semantica'
   TAG: 0.66
-  BRANCH_NAME: semantica
+  BRANCH_NAME: main
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
