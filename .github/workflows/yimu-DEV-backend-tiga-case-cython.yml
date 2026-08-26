@@ -1,4 +1,4 @@
-name: DEV-backend-tiga-case-cython
+name: yimu-DEV-backend-tiga-case-cython
 
 on:
   workflow_dispatch:
