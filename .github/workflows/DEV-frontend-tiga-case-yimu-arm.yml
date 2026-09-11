@@ -6,8 +6,8 @@ on:
 env:
   DOCKER_IMAGE: deploy_image/tiga-case-yimu
   REPOSITORY: lowcode-yunti/tiga-case-yimu
-  TAG: main
-  BRANCH_NAME: main
+  TAG: dachu1.0
+  BRANCH_NAME: dachu1.0
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
