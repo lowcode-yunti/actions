@@ -7,7 +7,7 @@ env:
   DOCKER_IMAGE: deploy_image/tiga-case
   REPOSITORY: 'lowcode-yunti/tiga-case'
   TAG: dev
-  BRANCH_NAME: yimu-dev
+  BRANCH_NAME: feat-WRENAI-0910
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
