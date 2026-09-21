@@ -30,6 +30,11 @@ jobs:
         id: current-date
         run: echo "date=$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')" >> "$GITHUB_OUTPUT"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Login to Docker Registry
         uses: docker/login-action@v3
         with:
@@ -47,7 +52,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/arm64
           file: ./Dockerfile
           push: true
           tags: |
