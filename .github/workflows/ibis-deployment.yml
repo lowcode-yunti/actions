@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ibis-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ibis
+  template:
+    metadata:
+      labels:
+        app: ibis
+    spec:
+      containers:
+        - name: ibis
+          image: registry.cn-shanghai.aliyuncs.com/cloudladder_shangyun/ibis:0.22.0-oracle11
+          env:
+            - name: WREN_ENGINE_ENDPOINT
+              value: "http://wren-engine:8080"
+          ports:
+            - name: http
+              containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ibis-server
+spec:
+  selector:
+    app: ibis
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
