@@ -1,35 +1,57 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ibis-server
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ibis
-  template:
-    metadata:
-      labels:
-        app: ibis
-    spec:
-      containers:
-        - name: ibis
-          image: registry.cn-shanghai.aliyuncs.com/cloudladder_shangyun/ibis:0.22.0-oracle11
-          env:
-            - name: WREN_ENGINE_ENDPOINT
-              value: "http://wren-engine:8080"
-          ports:
-            - name: http
-              containerPort: 8000
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ibis-server
-spec:
-  selector:
-    app: ibis
-  ports:
-    - name: http
-      port: 8000
-      targetPort: http
+name: ibis-deployment
+
+on:
+  workflow_dispatch:
+
+env:
+  DOCKER_IMAGE: cloudladder_shangyun/ibis
+  REPOSITORY: lowcode-yunti/ibis
+  TAG: 0.22.0-oracle11
+  BRANCH_NAME: main
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.BRANCH_NAME }}
+          token: ${{ secrets.ACTION_TOKEN }}
+
+      - name: Get the latest commit SHA of the repository
+        id: get-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Get current date
+        id: current-date
+        run: echo "date=$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+
+      - name: Build and push ibis Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.TAG }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.TAG }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ steps.get-sha.outputs.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
