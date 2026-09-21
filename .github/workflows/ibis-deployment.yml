@@ -49,6 +49,7 @@ jobs:
         with:
           images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}
 
+      # Aliyun ACR rejects Buildx default OCI attestations (empty.v1+json).
       - name: Build and push ibis Docker image
         uses: docker/build-push-action@v5
         with:
@@ -56,6 +57,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ./Dockerfile
           push: true
+          provenance: false
+          sbom: false
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.TAG }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}:${{ env.TAG }}-${{ steps.current-date.outputs.date }}
