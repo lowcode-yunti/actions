@@ -58,6 +58,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: docker/standalone/Dockerfile
           push: true
+          # ACR does not support OCI attestation manifests (vnd.oci.empty.v1+json)
+          provenance: false
+          sbom: false
           build-args: |
             INCLUDE_LOCAL_MODELS=true
             PRELOAD_ML_MODELS=true
