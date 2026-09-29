@@ -7,7 +7,7 @@ env:
   DOCKER_IMAGE: deploy_image/hindsight
   REPOSITORY: lowcode-yunti/hindsight
   TAG: main
-  BRANCH_NAME: dachu1.0
+  BRANCH_NAME: main
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
