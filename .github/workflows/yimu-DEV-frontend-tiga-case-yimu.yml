@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKER_IMAGE: deploy_image/tiga-case-yimu
+  DOCKER_IMAGE: cloudladder_public/tiga-case-yimu
   REPOSITORY: lowcode-yunti/tiga-case-yimu
   TAG: yimu
   BRANCH_NAME: dachu1.0
