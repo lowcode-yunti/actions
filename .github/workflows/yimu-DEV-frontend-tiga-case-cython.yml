@@ -48,6 +48,7 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
+          build-args: VITE_GENBI_MENU_ENABLED=false
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.BRANCH_NAME }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.BRANCH_NAME }}-${{ steps.current-date.outputs.date }}
