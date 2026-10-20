@@ -6,7 +6,7 @@ on:
 env:
   DOCKER_IMAGE: deploy_image/tiga-case
   REPOSITORY: 'lowcode-yunti/tiga-case'
-  TAG: dev
+  TAG: yimu-dev
   BRANCH_NAME: yimu-dev
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
@@ -51,7 +51,7 @@ jobs:
         with:
           context: ./backend
           platforms: linux/arm64
-          file: ./backend/Dockerfile
+          file: ./backend/Dockerfile.cython
           push: true
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ env.TAG }}-arm
