@@ -49,7 +49,7 @@ jobs:
           file: ./backend/Dockerfile.cython
           push: true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ env.BRANCH_NAME }}
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ env.BRANCH_NAME }}-${{ steps.current-date.outputs.date }}
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:${{ steps.get-sha.outputs.sha }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:hadianji
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:hadianji-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-backend:hadianji-${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
