@@ -50,7 +50,7 @@ jobs:
           push: true
           build-args: VITE_GENBI_MENU_ENABLED=true
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.BRANCH_NAME }}
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ env.BRANCH_NAME }}-${{ steps.current-date.outputs.date }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:tiejian-dev
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:tiejian-dev-${{ steps.current-date.outputs.date }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:${{ steps.get-sha.outputs.sha }}
           labels: ${{ steps.meta.outputs.labels }}
