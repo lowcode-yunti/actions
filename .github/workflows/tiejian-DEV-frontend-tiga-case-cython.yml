@@ -48,7 +48,9 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          build-args: VITE_GENBI_MENU_ENABLED=true
+          build-args: |
+           VITE_GENBI_MENU_ENABLED=true
+           VITE_DATABASE_MENU_ENABLED=false
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:tiejian-dev
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:tiejian-dev-${{ steps.current-date.outputs.date }}
