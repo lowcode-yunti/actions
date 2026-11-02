@@ -69,6 +69,16 @@ on:
         description: "客户构建的 BUILD_ID（写进镜像水印，仅 variant=customer/all 生效）"
         type: string
         default: ""
+      license_server_url:
+        description: "客户构建的授权服务地址，如 https://license.example.com（仅 variant=customer/all 生效）"
+        type: string
+        required: false
+        default: ""
+      license_ca_sha256:
+        description: "客户构建的授权服务 CA 证书 sha256（64 位小写 hex，仅 variant=customer/all 生效）"
+        type: string
+        required: false
+        default: ""
 
 # 同一 ref + variant + 架构重复触发时取消上一次未完成的构建，避免占满 runner 与缓存配额。
 # 架构必须进 group：amd64 和 arm64 分两次跑时不能互相取消。
@@ -225,12 +235,16 @@ jobs:
   # ==========================================================================
   # 客户构建：COMPILE=1 + LICENSE_ENFORCED=1
   #
-  # 需要的 secrets / vars（配在 actions 仓库上）：
+  # 每次触发时在 inputs 里填（都属于「这次构建的发布参数」，不该固化成仓库级配置）：
+  #   inputs.license_server_url   授权服务地址
+  #   inputs.license_ca_sha256    服务端 CA 证书的 sha256（hex）
+  #   inputs.build_id             BUILD_ID（留空用 commit sha）
+  #
+  # 仓库级 secrets / vars（才是真正的凭据，不能进 inputs——inputs 会出现在
+  # run 记录页面与 API 响应里）：
   #   secrets.LICENSE_SIGNING_KEY   ed25519 raw seed 的 base64（只在本 job 内落盘到
   #                                 $RUNNER_TEMP，绝不进构建上下文/镜像层）
-  #   vars.LICENSE_SERVER_URL       授权服务地址
-  #   vars.LICENSE_CA_SHA256        服务端 CA 证书的 sha256（hex）
-  #   vars.LICENSE_INTEGRITY_PUBKEY ed25519 公钥 base64（32 字节 raw）
+  #   vars.LICENSE_INTEGRITY_PUBKEY ed25519 公钥 base64（32 字节 raw，公开信息）
   #
   # COMPILE=1 配 LICENSE_ENFORCED=0 是不可用组合（Dockerfile 会直接失败），
   # 所以客户构建固定两个都为 1。
@@ -249,24 +263,24 @@ jobs:
           ref: ${{ github.event.inputs.ref || env.BRANCH_NAME }}
           token: ${{ secrets.ACTION_TOKEN }}
 
-      - name: 校验必需的 secret / vars（缺失即失败，不产半成品）
+      - name: 校验必需的 secret / inputs（缺失即失败，不产半成品）
         env:
           SIGNING_KEY: ${{ secrets.LICENSE_SIGNING_KEY }}
-          SERVER_URL: ${{ vars.LICENSE_SERVER_URL }}
-          CA_SHA256: ${{ vars.LICENSE_CA_SHA256 }}
+          SERVER_URL: ${{ github.event.inputs.license_server_url }}
+          CA_SHA256: ${{ github.event.inputs.license_ca_sha256 }}
           PUBKEY: ${{ vars.LICENSE_INTEGRITY_PUBKEY }}
         run: |
           set -euo pipefail
           missing=()
           [ -n "${SIGNING_KEY}" ] || missing+=("secrets.LICENSE_SIGNING_KEY")
-          [ -n "${SERVER_URL}" ]  || missing+=("vars.LICENSE_SERVER_URL")
-          [ -n "${CA_SHA256}" ]   || missing+=("vars.LICENSE_CA_SHA256")
+          [ -n "${SERVER_URL}" ]  || missing+=("inputs.license_server_url")
+          [ -n "${CA_SHA256}" ]   || missing+=("inputs.license_ca_sha256")
           [ -n "${PUBKEY}" ]      || missing+=("vars.LICENSE_INTEGRITY_PUBKEY")
           if [ ${#missing[@]} -gt 0 ]; then
             echo "缺少以下配置，客户构建无法进行：" >&2
             printf '  - %s\n' "${missing[@]}" >&2
-            echo "提示：secrets 在 Settings→Secrets and variables→Actions→Secrets，" >&2
-            echo "      vars 在同一页面的 Variables。" >&2
+            echo "提示：inputs 在触发 workflow 时的表单里填；secrets / vars 在" >&2
+            echo "      Settings→Secrets and variables→Actions 配置。" >&2
             exit 1
           fi
           # 只校验形状，不回显内容
@@ -275,7 +289,10 @@ jobs:
           echo "${PUBKEY}" | base64 -d | wc -c | grep -qx 32 \
             || { echo "LICENSE_INTEGRITY_PUBKEY 必须是 base64 编码的 ed25519 raw 32 字节公钥" >&2; exit 1; }
           echo "${CA_SHA256}" | grep -Eqx '[0-9a-f]{64}' \
-            || { echo "LICENSE_CA_SHA256 必须是 64 位小写十六进制" >&2; exit 1; }
+            || { echo "inputs.license_ca_sha256 必须是 64 位小写十六进制" >&2; exit 1; }
+          # 服务端 URL 会被写进镜像并被客户端拿去连授权服务，形状错了等于发个连不上的镜像
+          echo "${SERVER_URL}" | grep -Eqx 'https?://[^[:space:]]+' \
+            || { echo "inputs.license_server_url 必须是 http(s):// 开头的完整地址" >&2; exit 1; }
           echo "配置形状校验通过"
 
       - name: 解析构建平台
@@ -339,11 +356,11 @@ jobs:
           ls -l "${RUNNER_TEMP}/license_signing_key"
 
       - name: 构建并推送 staging 镜像（强制重跑 builder）
-        # 构建参数通过 env 传入，不直接插值进 shell：`${{ vars.X }}` 是原样文本替换，
+        # 构建参数通过 env 传入，不直接插值进 shell：`${{ inputs.X }}` 是原样文本替换，
         # 值里带引号/分号就会被当成命令执行。env + 双引号是最小化风险的做法。
         env:
-          LICENSE_SERVER_URL: ${{ vars.LICENSE_SERVER_URL }}
-          LICENSE_CA_SHA256: ${{ vars.LICENSE_CA_SHA256 }}
+          LICENSE_SERVER_URL: ${{ github.event.inputs.license_server_url }}
+          LICENSE_CA_SHA256: ${{ github.event.inputs.license_ca_sha256 }}
           LICENSE_INTEGRITY_PUBKEY: ${{ vars.LICENSE_INTEGRITY_PUBKEY }}
           BUILD_ID: ${{ github.event.inputs.build_id }}
         run: |
