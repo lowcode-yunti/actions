@@ -1,0 +1,609 @@
+# FastapiAdmin（mcp_gateway）镜像构建 + 推送到阿里云 ACR。
+#
+# 来源：FastapiAdmin/.github/workflows/docker-image.yml。改动点：
+#   1. 本 workflow 在 actions 仓库里跑，源码用 actions/checkout 把
+#      lowcode-yunti/mcp_gateway 拉进 workdir，不用 actions 仓库自己的源码；
+#   2. 产物从「docker save 成 artifact」改成「直接 push 到 ACR」，
+#      镜像名遵循本仓库约定：cloudladder_public/mcp-gateway-{backend,frontend}；
+#   3. 仍用 `docker buildx build` 而不是 docker/build-push-action：客户构建必须显式
+#      `--no-cache-filter builder`（BuildKit 不把 secret 内容算进缓存键，暖缓存会静默
+#      复用旧产物、跳过 integrity.json 重新生成），命令行写法更直白；
+#   4. `--provenance=false --sbom=false`：ACR 不支持 OCI attestation manifest
+#      （application/vnd.oci.empty.v1+json），开着会在 push 阶段被 denied，
+#      参见 HINDSIGHT.yml 那次失败；
+#   5. 支持 arm64 / amd64 多架构（见下面的「多架构与门禁顺序」）。
+#
+# ── 多架构与门禁顺序 ────────────────────────────────────────────────────────
+# 触发时用 inputs.platforms 选：
+#   linux/amd64                 只出 amd64（源仓库 docker-compose.yaml 的 platform）
+#   linux/arm64                 只出 arm64（如国产化 ARM 服务器 / 鲲鹏）
+#   linux/amd64,linux/arm64     两个架构合成一个 manifest list（推荐交付用）
+#
+# 多架构时 `--load` 不可用（本地 docker image store 装不下多平台镜像），所以门禁顺序
+# 改成「推 staging → 拉本机架构校验 → 提升为正式 tag」：
+#   1. 先 push 到 IMAGE:staging-<sha>，正式 tag 一个都不动；
+#   2. 用 runner 的本机架构（amd64）拉回来跑交付形态校验；
+#   3. 校验通过才用 `buildx imagetools create` 把 staging 的 manifest 引用复制到
+#      正式 tag —— 这一步不发任何 layer，所以没有失败重建的风险。
+# 校验不通过时正式 tag 不会被指向新镜像，坏镜像进不了生产。
+#
+# 输出用 `--output type=image,...,oci-mediatypes=false` 而不是 `--push`：
+# 让 manifest list 用 Docker v2（application/vnd.docker.distribution.manifest.list.v2+json）
+# 而不是 OCI index。ACR 对 OCI index 的支持因实例版本而异，Docker v2 manifest list
+# 是兼容性最好的形式（本地起 registry:2 实测两种都能推，但 ACR 保守选后者）。
+#
+# 跨架构注意：
+#   - 请求 arm64 时（runner 是 amd64）需要 QEMU，下面按需启用；
+#   - backend 的客户构建（COMPILE=1）编译的是原生 .so，arm64 走 QEMU 会明显变慢。
+#     要快就单独触发一次 platforms=linux/arm64 并换 ARM runner（runs-on: ubuntu-24.04-arm），
+#     两个架构分别推同一 tag；提升那一步会检测到 tag 已存在并改用 --append，
+#     把第二种架构追加进 manifest list（本地实测 amd64+arm64 → ['amd64','arm64']）。
+
+name: mcp-gateway-docker-image
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "构建哪些镜像"
+        type: choice
+        options: [all, internal, customer, frontend]
+        default: all
+      platforms:
+        description: "目标架构"
+        type: choice
+        options:
+          - linux/amd64
+          - linux/arm64
+          - linux/amd64,linux/arm64
+        default: linux/amd64
+      ref:
+        description: "源码分支（留空用 env.BRANCH_NAME）"
+        type: string
+        default: ""
+      image_tag:
+        description: "镜像 tag（留空用 git sha）"
+        type: string
+        default: ""
+      build_id:
+        description: "客户构建的 BUILD_ID（写进镜像水印，仅 variant=customer/all 生效）"
+        type: string
+        default: ""
+
+# 同一 ref + variant + 架构重复触发时取消上一次未完成的构建，避免占满 runner 与缓存配额。
+# 架构必须进 group：amd64 和 arm64 分两次跑时不能互相取消。
+concurrency:
+  group: mcp-gateway-${{ github.event.inputs.variant || 'all' }}-${{ github.event.inputs.ref || 'default' }}-${{ github.event.inputs.platforms || 'linux/amd64' }}
+  cancel-in-progress: true
+
+env:
+  REPOSITORY: 'lowcode-yunti/mcp_gateway'
+  BRANCH_NAME: feat/code-protection
+  DOCKER_IMAGE: cloudladder_public/mcp-gateway
+  DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
+  DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+
+jobs:
+  # ==========================================================================
+  # 内部构建：COMPILE=0，含源码，不需要任何授权密钥
+  # ==========================================================================
+  backend-internal:
+    name: backend（内部构建 COMPILE=0）
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.variant == 'all' ||
+      github.event.inputs.variant == 'internal'
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ github.event.inputs.ref || env.BRANCH_NAME }}
+          token: ${{ secrets.ACTION_TOKEN }}
+
+      - name: 解析构建平台
+        id: plat
+        run: |
+          set -euo pipefail
+          PLATFORMS="${{ github.event.inputs.platforms }}"
+          [ -n "${PLATFORMS}" ] || PLATFORMS="linux/amd64"
+          echo "platforms=${PLATFORMS}" >> "$GITHUB_OUTPUT"
+
+          # 门禁校验用 runner 本机架构：拉到别的架构会走 QEMU，慢且可能跑不起来
+          if [ "${RUNNER_ARCH}" = "ARM64" ]; then
+            NATIVE="linux/arm64"
+          else
+            NATIVE="linux/amd64"
+          fi
+          echo "native=${NATIVE}" >> "$GITHUB_OUTPUT"
+
+          # QEMU 只在「要 arm64 但 runner 不是 arm64」时需要
+          if [ "${RUNNER_ARCH}" != "ARM64" ] && echo "${PLATFORMS}" | grep -q arm64; then
+            echo "need_qemu=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "need_qemu=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "目标架构: ${PLATFORMS} / runner: ${NATIVE}"
+
+      - name: 计算版本信息
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "${TAG}" ]; then
+            TAG="$(git rev-parse --short=12 HEAD)"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "date=$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          # staging tag 按 commit 固定：同一 commit 重跑只会覆盖，不会在 ACR 里堆垃圾
+          echo "staging=staging-$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: 启用 QEMU（跨架构构建）
+        if: steps.plat.outputs.need_qemu == 'true'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: 设置 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 构建并推送 staging 镜像
+        run: |
+          set -euo pipefail
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
+          docker buildx build \
+            --platform "${{ steps.plat.outputs.platforms }}" \
+            --file docker/backend/Dockerfile \
+            --build-arg COMPILE=0 \
+            --build-arg "BUILD_ID=${{ steps.meta.outputs.sha }}" \
+            --build-arg "BUILD_COMMIT=${{ steps.meta.outputs.sha }}" \
+            --provenance=false \
+            --sbom=false \
+            --cache-from type=gha,scope=mcp-gateway-backend-internal \
+            --cache-to type=gha,mode=max,scope=mcp-gateway-backend-internal \
+            --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
+            .
+
+      - name: 校验内部镜像的交付形态（拉本机架构）
+        run: |
+          set -euo pipefail
+          IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
+          # 多架构 tag 拉取必须指定 --platform，否则 docker 会取默认架构或报
+          # "no matching manifest"；这里固定拉 runner 本机架构做门禁。
+          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          # 内部镜像的预期：源码在、没有 integrity.json、没有 .so。
+          # 不做 create_app()：那需要真实的 PG/Redis，CI 里没有，会让门禁假红。
+          docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint sh "${IMG}" -c '
+          set -e
+          test -f /home/main.py || { echo "缺少 /home/main.py" >&2; exit 1; }
+          test -f /home/app/factory.py || { echo "内部镜像应保留源码，但 app/factory.py 不存在" >&2; exit 1; }
+          if [ -e /home/app/core/license/integrity.json ]; then
+            echo "内部镜像不应包含完整性清单" >&2; exit 1
+          fi
+          if find /home/app -name "*.so" | grep -q .; then
+            echo "内部镜像不应包含 .so" >&2; exit 1
+          fi
+          echo "layout ok"
+          '
+
+      - name: 提升为正式 tag
+        run: |
+          set -euo pipefail
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
+          SRC="${IMAGE}:${{ steps.meta.outputs.staging }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          # --append 只在目标 tag 已存在时可用（分两次跑 amd64 / arm64 时，第二次要把
+          # 自己的架构追加进已有 manifest list，而不是覆盖成单架构）。
+          # 首次发布目标 tag 不存在，直接 create。
+          APPEND=""
+          if docker buildx imagetools inspect "${IMAGE}:internal-${TAG}" >/dev/null 2>&1; then
+            APPEND="--append"
+            echo "目标 tag 已存在，追加架构"
+          else
+            echo "目标 tag 不存在，首次创建"
+          fi
+          docker buildx imagetools create ${APPEND} \
+            -t "${IMAGE}:internal-${TAG}" \
+            -t "${IMAGE}:internal-${TAG}-${{ steps.meta.outputs.date }}" \
+            -t "${IMAGE}:${{ steps.meta.outputs.sha }}" \
+            "${SRC}"
+
+      - name: 打印多架构 manifest（确认两个架构都在）
+        run: |
+          set -euo pipefail
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:internal-${{ steps.meta.outputs.tag }}"
+          docker buildx imagetools inspect "${IMAGE}"
+
+  # ==========================================================================
+  # 客户构建：COMPILE=1 + LICENSE_ENFORCED=1
+  #
+  # 需要的 secrets / vars（配在 actions 仓库上）：
+  #   secrets.LICENSE_SIGNING_KEY   ed25519 raw seed 的 base64（只在本 job 内落盘到
+  #                                 $RUNNER_TEMP，绝不进构建上下文/镜像层）
+  #   vars.LICENSE_SERVER_URL       授权服务地址
+  #   vars.LICENSE_CA_SHA256        服务端 CA 证书的 sha256（hex）
+  #   vars.LICENSE_INTEGRITY_PUBKEY ed25519 公钥 base64（32 字节 raw）
+  #
+  # COMPILE=1 配 LICENSE_ENFORCED=0 是不可用组合（Dockerfile 会直接失败），
+  # 所以客户构建固定两个都为 1。
+  # ==========================================================================
+  backend-customer:
+    name: backend（客户构建 COMPILE=1）
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.variant == 'all' ||
+      github.event.inputs.variant == 'customer'
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ github.event.inputs.ref || env.BRANCH_NAME }}
+          token: ${{ secrets.ACTION_TOKEN }}
+
+      - name: 校验必需的 secret / vars（缺失即失败，不产半成品）
+        env:
+          SIGNING_KEY: ${{ secrets.LICENSE_SIGNING_KEY }}
+          SERVER_URL: ${{ vars.LICENSE_SERVER_URL }}
+          CA_SHA256: ${{ vars.LICENSE_CA_SHA256 }}
+          PUBKEY: ${{ vars.LICENSE_INTEGRITY_PUBKEY }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${SIGNING_KEY}" ] || missing+=("secrets.LICENSE_SIGNING_KEY")
+          [ -n "${SERVER_URL}" ]  || missing+=("vars.LICENSE_SERVER_URL")
+          [ -n "${CA_SHA256}" ]   || missing+=("vars.LICENSE_CA_SHA256")
+          [ -n "${PUBKEY}" ]      || missing+=("vars.LICENSE_INTEGRITY_PUBKEY")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "缺少以下配置，客户构建无法进行：" >&2
+            printf '  - %s\n' "${missing[@]}" >&2
+            echo "提示：secrets 在 Settings→Secrets and variables→Actions→Secrets，" >&2
+            echo "      vars 在同一页面的 Variables。" >&2
+            exit 1
+          fi
+          # 只校验形状，不回显内容
+          echo "${SIGNING_KEY}" | base64 -d | wc -c | grep -qx 32 \
+            || { echo "LICENSE_SIGNING_KEY 必须是 base64 编码的 ed25519 raw 32 字节 seed" >&2; exit 1; }
+          echo "${PUBKEY}" | base64 -d | wc -c | grep -qx 32 \
+            || { echo "LICENSE_INTEGRITY_PUBKEY 必须是 base64 编码的 ed25519 raw 32 字节公钥" >&2; exit 1; }
+          echo "${CA_SHA256}" | grep -Eqx '[0-9a-f]{64}' \
+            || { echo "LICENSE_CA_SHA256 必须是 64 位小写十六进制" >&2; exit 1; }
+          echo "配置形状校验通过"
+
+      - name: 解析构建平台
+        id: plat
+        run: |
+          set -euo pipefail
+          PLATFORMS="${{ github.event.inputs.platforms }}"
+          [ -n "${PLATFORMS}" ] || PLATFORMS="linux/amd64"
+          echo "platforms=${PLATFORMS}" >> "$GITHUB_OUTPUT"
+          if [ "${RUNNER_ARCH}" = "ARM64" ]; then
+            NATIVE="linux/arm64"
+          else
+            NATIVE="linux/amd64"
+          fi
+          echo "native=${NATIVE}" >> "$GITHUB_OUTPUT"
+          if [ "${RUNNER_ARCH}" != "ARM64" ] && echo "${PLATFORMS}" | grep -q arm64; then
+            echo "need_qemu=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "need_qemu=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "目标架构: ${PLATFORMS} / runner: ${NATIVE}"
+
+      - name: 计算版本信息
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "${TAG}" ]; then
+            TAG="$(git rev-parse --short=12 HEAD)"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "date=$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "staging=staging-customer-$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: 启用 QEMU（跨架构构建）
+        if: steps.plat.outputs.need_qemu == 'true'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: 设置 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 写签名私钥到 runner 临时目录
+        env:
+          SIGNING_KEY: ${{ secrets.LICENSE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          # 关键：必须落在构建上下文（仓库根）之外。cython_build.py 会拒绝
+          # checkout 内的密钥文件，而且 git 上下文里的文件可能被 COPY 进镜像。
+          umask 077
+          printf '%s' "${SIGNING_KEY}" > "${RUNNER_TEMP}/license_signing_key"
+          ls -l "${RUNNER_TEMP}/license_signing_key"
+
+      - name: 构建并推送 staging 镜像（强制重跑 builder）
+        # 构建参数通过 env 传入，不直接插值进 shell：`${{ vars.X }}` 是原样文本替换，
+        # 值里带引号/分号就会被当成命令执行。env + 双引号是最小化风险的做法。
+        env:
+          LICENSE_SERVER_URL: ${{ vars.LICENSE_SERVER_URL }}
+          LICENSE_CA_SHA256: ${{ vars.LICENSE_CA_SHA256 }}
+          LICENSE_INTEGRITY_PUBKEY: ${{ vars.LICENSE_INTEGRITY_PUBKEY }}
+          BUILD_ID: ${{ github.event.inputs.build_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BUILD_ID}" ]; then
+            BUILD_ID="${{ steps.meta.outputs.sha }}"
+          fi
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
+          # --no-cache-filter builder 不是优化开关，是**正确性**要求：
+          # 命中暖缓存时那条带 secret 的 RUN 根本不会执行，你会拿到上一把私钥
+          # 签的 integrity.json。
+          # 注意：多架构下这个 filter 对每个平台都生效，arm64 走 QEMU 时 Cython
+          # 编译会明显变慢（这正是源仓库那些 arm workflow 的耗时来源）。
+          docker buildx build \
+            --platform "${{ steps.plat.outputs.platforms }}" \
+            --file docker/backend/Dockerfile \
+            --no-cache-filter builder \
+            --build-arg COMPILE=1 \
+            --build-arg LICENSE_ENFORCED=1 \
+            --build-arg "LICENSE_SERVER_URL=${LICENSE_SERVER_URL}" \
+            --build-arg "LICENSE_CA_SHA256=${LICENSE_CA_SHA256}" \
+            --build-arg "LICENSE_INTEGRITY_PUBKEY=${LICENSE_INTEGRITY_PUBKEY}" \
+            --build-arg "BUILD_ID=${BUILD_ID}" \
+            --build-arg "BUILD_COMMIT=${{ steps.meta.outputs.sha }}" \
+            --secret "id=license_signing_key,src=${RUNNER_TEMP}/license_signing_key" \
+            --provenance=false \
+            --sbom=false \
+            --cache-from type=gha,scope=mcp-gateway-backend-customer \
+            --cache-to type=gha,mode=max,scope=mcp-gateway-backend-customer \
+            --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
+            .
+
+      - name: 清掉私钥
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/license_signing_key"
+
+      - name: 校验交付形态（拉本机架构：源码已删 / .so 齐全 / 无字节码残留）
+        run: |
+          set -euo pipefail
+          IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
+          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          # 期望输出：compiled: 56 plaintext: 5 missing: [] stale sources: []
+          docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint python "${IMG}" -c '
+          import json
+          from app.core.license.integrity import default_manifest_path
+
+          manifest = default_manifest_path()
+          root = manifest.parents[3]
+          files = json.loads(manifest.read_text(encoding="utf-8"))["files"]
+          so = [key for key in files if key.endswith((".so", ".pyd"))]
+          missing = [key for key in so if not (root / key).is_file()]
+          stale = [
+              str(p)
+              for key in so
+              if (p := (root / key).parent / ((root / key).name.split(".")[0] + ".py")).exists()
+          ]
+          print("compiled:", len(so), "plaintext:", len(files) - len(so))
+          print("missing:", missing)
+          print("stale sources:", stale)
+          assert len(so) == 56, f"编译目标数量不对: {len(so)} != 56"
+          assert not missing and not stale, "交付树里缺 .so 或残留 .py"
+          '
+
+      - name: 提升为正式 tag
+        run: |
+          set -euo pipefail
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
+          SRC="${IMAGE}:${{ steps.meta.outputs.staging }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          # 同 backend：目标 tag 已存在则追加架构，否则首次创建
+          APPEND=""
+          if docker buildx imagetools inspect "${IMAGE}:customer-${TAG}" >/dev/null 2>&1; then
+            APPEND="--append"
+            echo "目标 tag 已存在，追加架构"
+          fi
+          docker buildx imagetools create ${APPEND} \
+            -t "${IMAGE}:customer-${TAG}" \
+            -t "${IMAGE}:customer-${TAG}-${{ steps.meta.outputs.date }}" \
+            "${SRC}"
+
+      - name: 打印多架构 manifest
+        run: |
+          set -euo pipefail
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:customer-${{ steps.meta.outputs.tag }}"
+          docker buildx imagetools inspect "${IMAGE}"
+
+  # ==========================================================================
+  # 前端：构建 dist → nginx 静态站点镜像
+  # ==========================================================================
+  frontend:
+    name: frontend（web dist → nginx 镜像）
+    runs-on: ubuntu-latest
+    if: |
+      github.event.inputs.variant == 'all' ||
+      github.event.inputs.variant == 'frontend'
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ github.event.inputs.ref || env.BRANCH_NAME }}
+          token: ${{ secrets.ACTION_TOKEN }}
+
+      - name: 解析构建平台
+        id: plat
+        run: |
+          set -euo pipefail
+          PLATFORMS="${{ github.event.inputs.platforms }}"
+          [ -n "${PLATFORMS}" ] || PLATFORMS="linux/amd64"
+          echo "platforms=${PLATFORMS}" >> "$GITHUB_OUTPUT"
+          if [ "${RUNNER_ARCH}" = "ARM64" ]; then
+            NATIVE="linux/arm64"
+          else
+            NATIVE="linux/amd64"
+          fi
+          echo "native=${NATIVE}" >> "$GITHUB_OUTPUT"
+          if [ "${RUNNER_ARCH}" != "ARM64" ] && echo "${PLATFORMS}" | grep -q arm64; then
+            echo "need_qemu=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "need_qemu=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "目标架构: ${PLATFORMS} / runner: ${NATIVE}"
+
+      - name: 计算版本信息
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "${TAG}" ]; then
+            TAG="$(git rev-parse --short=12 HEAD)"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "date=$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "staging=staging-frontend-$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # 与 frontend/web/package.json 的 packageManager 一致
+          version: 9.15.3
+
+      - uses: actions/setup-node@v4
+        with:
+          # engines 要求 >=20.19.0（vite 7 的门槛）
+          node-version: 20.19.0
+          # 仓库根是 pnpm workspace（pnpm-workspace.yaml 包含 frontend/web），
+          # 锁文件是根目录那份，不是 frontend/web/pnpm-lock.yaml。
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: 安装依赖
+        # 必须在仓库根装：依赖提升到根 node_modules，frontend/web 里再单独装会
+        # 与 workspace 的 lockfile 不一致（--frozen-lockfile 直接失败）。
+        run: pnpm install --frozen-lockfile
+
+      # src/types/{auto-imports,components}.d.ts 由 unplugin-* 在 vite 运行时生成，
+      # 仓库按惯例不跟踪，所以必须先构建一次再跑类型检查。
+      #
+      # VITE_* 是构建期内联进产物的，环境差异必须在这里给，运行期注入无效。
+      # 源仓库的 .env.production 不入库；这里显式给出容器版默认值：
+      #   - base 用 /web，与 nginx 站点路径一致；
+      #   - API 走同源（/api/v1 由同镜像内的 nginx 反代到 backend:8001），
+      #     WS 端点必须绝对地址，由 vars.MCP_GATEWAY_WS_ENDPOINT 提供。
+      - name: 生产构建
+        working-directory: frontend/web
+        env:
+          VITE_BASE_URL: /web
+          VITE_APP_BASE_API: /api/v1
+          VITE_APP_WS_ENDPOINT: ${{ vars.MCP_GATEWAY_WS_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          test -n "${VITE_APP_WS_ENDPOINT}" || {
+            echo "缺少 vars.MCP_GATEWAY_WS_ENDPOINT（形如 wss://your-domain.com）" >&2
+            exit 1
+          }
+          pnpm run build:prod
+
+      - name: 类型检查
+        working-directory: frontend/web
+        # 已知存量错误（源仓库 78~118 个 TS error），先不阻塞镜像产出；
+        # 源仓库清干净后把这一行去掉改成硬门禁。
+        continue-on-error: true
+        run: pnpm run type-check
+
+      - name: 组装镜像上下文
+        run: |
+          set -euo pipefail
+          test -f frontend/web/dist/index.html \
+            || { echo "dist/index.html 不存在，构建没有产出" >&2; exit 1; }
+          rm -rf .ci
+          mkdir -p .ci/web/html/web
+          cp docker/mcp-gateway/nginx.conf .ci/web/nginx.conf
+          cp docker/mcp-gateway/web.Dockerfile .ci/web/Dockerfile
+          # 末尾的 /. ：复制内容而不是目录本身
+          cp -a frontend/web/dist/. .ci/web/html/web/
+          du -sh .ci/web
+
+      - name: 启用 QEMU（跨架构构建）
+        if: steps.plat.outputs.need_qemu == 'true'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: 设置 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 构建并推送 staging 镜像
+        run: |
+          set -euo pipefail
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend"
+          docker buildx build \
+            --platform "${{ steps.plat.outputs.platforms }}" \
+            --file .ci/web/Dockerfile \
+            --provenance=false \
+            --sbom=false \
+            --cache-from type=gha,scope=mcp-gateway-frontend \
+            --cache-to type=gha,mode=max,scope=mcp-gateway-frontend \
+            --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
+            .ci/web
+
+      - name: 校验镜像（配置语法 + 产物存在）
+        run: |
+          set -euo pipefail
+          IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend:${{ steps.meta.outputs.staging }}"
+          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          # nginx -t 会加载 conf.d/default.conf：配置写错（比如 upstream 主机名解析、
+          # 正则 location 冲突）在这一步就会失败，不用等起容器。
+          docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint sh "${IMG}" -c '
+          set -e
+          test -f /usr/share/nginx/html/web/index.html || { echo "镜像里没有 index.html" >&2; exit 1; }
+          nginx -t
+          '
+
+      - name: 提升为正式 tag
+        run: |
+          set -euo pipefail
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend"
+          SRC="${IMAGE}:${{ steps.meta.outputs.staging }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          # 同 backend：目标 tag 已存在则追加架构，否则首次创建
+          APPEND=""
+          if docker buildx imagetools inspect "${IMAGE}:${TAG}" >/dev/null 2>&1; then
+            APPEND="--append"
+            echo "目标 tag 已存在，追加架构"
+          fi
+          docker buildx imagetools create ${APPEND} \
+            -t "${IMAGE}:${TAG}" \
+            -t "${IMAGE}:${TAG}-${{ steps.meta.outputs.date }}" \
+            -t "${IMAGE}:${{ steps.meta.outputs.sha }}" \
+            "${SRC}"
+
+      - name: 打印多架构 manifest
+        run: |
+          set -euo pipefail
+          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend:${{ steps.meta.outputs.tag }}"
+          docker buildx imagetools inspect "${IMAGE}"

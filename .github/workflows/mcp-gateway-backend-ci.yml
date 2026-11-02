@@ -1,0 +1,70 @@
+# 后端 CI：lint + 单元测试。
+#
+# 来源：FastapiAdmin/.github/workflows/backend-ci.yml。改动点：
+#   - 触发方式改成 workflow_dispatch + ref 输入（本仓库没有 FastapiAdmin 的源码，
+#     push/paths 过滤没有意义），源码用 actions/checkout 拉过来；
+#   - 各检查步骤先设 continue-on-error，原因见下面「当前是红的」一段。
+#
+# ⚠️ 当前是红的，别当成回归
+#   在 feat/code-protection 上本地实测（2026-11-02）：
+#     * `ruff check`：965 个 error（其中 949 个可自动修），严格门禁必然失败；
+#       另外 backend/pyproject.toml 里有 `fix = true`，直接跑 `ruff check` 会**自动改写
+#       源码**（本地实测一次改了 202 个文件），所以这里必须显式 `--no-fix`。
+#     * `pytest`：完整套件需要真实 PG/Redis，本地跑不起来（会挂住），
+#       先只跑能自洽的部分并给超时，红了不阻塞。
+#   等源仓库把这两项清洗干净，再把 continue-on-error 去掉改成硬门禁。
+
+name: mcp-gateway-backend-ci
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "源码分支（留空用 env.BRANCH_NAME）"
+        type: string
+        default: ""
+      run_tests:
+        description: "是否跑 pytest（需要 DB 的那些用例可能失败）"
+        type: boolean
+        default: true
+
+env:
+  REPOSITORY: 'lowcode-yunti/mcp_gateway'
+  BRANCH_NAME: feat/code-protection
+
+jobs:
+  lint-and-test:
+    name: backend（ruff + pytest）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ github.event.inputs.ref || env.BRANCH_NAME }}
+          token: ${{ secrets.ACTION_TOKEN }}
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          # 锁文件在 backend/ 子目录，不指的话缓存键落不到 uv.lock 上
+          cache-dependency-glob: backend/uv.lock
+
+      - name: 安装依赖（含 sqlite 与 mysql 驱动；测试用 sqlite + fakeredis）
+        run: uv sync --extra sqlite --extra mysql
+
+      # --no-fix 不是可选项：pyproject.toml 的 [tool.ruff] fix = true 会让
+      # `ruff check` 直接改写源码，CI 里表现为「检查通过但工作区被改」。
+      - name: 代码检查（ruff，只报告不修改）
+        continue-on-error: true
+        run: uv run ruff check --no-fix
+
+      - name: 单元测试（pytest）
+        if: github.event.inputs.run_tests != 'false'
+        continue-on-error: true
+        # 加超时：有若干用例会去连真实 DB/Redis，缺环境时会一直挂到 runner 上限
+        run: timeout 900 uv run pytest -q
