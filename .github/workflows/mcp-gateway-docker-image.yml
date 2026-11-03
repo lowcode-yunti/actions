@@ -20,9 +20,12 @@
 #   linux/amd64,linux/arm64     两个架构合成一个 manifest list（推荐交付用）
 #
 # 多架构时 `--load` 不可用（本地 docker image store 装不下多平台镜像），所以门禁顺序
-# 改成「推 staging → 拉本机架构校验 → 提升为正式 tag」：
+# 改成「推 staging → 拉指定架构校验 → 提升为正式 tag」：
 #   1. 先 push 到 IMAGE:staging-<sha>，正式 tag 一个都不动；
-#   2. 用 runner 的本机架构（amd64）拉回来跑交付形态校验；
+#   2. 门禁架构（gate）与 inputs.platforms 对齐：
+#        platforms=linux/arm64              → pull/run 用 linux/arm64
+#        platforms=linux/amd64              → pull/run 用 linux/amd64
+#        platforms=linux/amd64,linux/arm64  → pull/run 用 linux/amd64（验 manifest 的一片）
 #   3. 校验通过才用 `buildx imagetools create` 把 staging 的 manifest 引用复制到
 #      正式 tag —— 这一步不发任何 layer，所以没有失败重建的风险。
 # 校验不通过时正式 tag 不会被指向新镜像，坏镜像进不了生产。
@@ -70,7 +73,7 @@ on:
         type: string
         default: ""
       license_server_url:
-        description: "客户构建的授权服务地址，如 https://license.example.com（仅 variant=customer/all 生效）"
+        description: "客户构建的授权服务地址，如 https://license.example.com:8443（仅 variant=customer/all 生效）"
         type: string
         required: false
         default: ""
@@ -119,13 +122,14 @@ jobs:
           [ -n "${PLATFORMS}" ] || PLATFORMS="linux/amd64"
           echo "platforms=${PLATFORMS}" >> "$GITHUB_OUTPUT"
 
-          # 门禁校验用 runner 本机架构：拉到别的架构会走 QEMU，慢且可能跑不起来
-          if [ "${RUNNER_ARCH}" = "ARM64" ]; then
-            NATIVE="linux/arm64"
+          if [ "${PLATFORMS}" = "linux/arm64" ]; then
+            GATE="linux/arm64"
+          elif [ "${PLATFORMS}" = "linux/amd64" ]; then
+            GATE="linux/amd64"
           else
-            NATIVE="linux/amd64"
+            GATE="linux/amd64"
           fi
-          echo "native=${NATIVE}" >> "$GITHUB_OUTPUT"
+          echo "gate=${GATE}" >> "$GITHUB_OUTPUT"
 
           # QEMU 只在「要 arm64 但 runner 不是 arm64」时需要
           if [ "${RUNNER_ARCH}" != "ARM64" ] && echo "${PLATFORMS}" | grep -q arm64; then
@@ -133,7 +137,7 @@ jobs:
           else
             echo "need_qemu=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "目标架构: ${PLATFORMS} / runner: ${NATIVE}"
+          echo "目标架构: ${PLATFORMS} / 门禁: ${GATE}"
 
       - name: 计算版本信息
         id: meta
@@ -182,16 +186,12 @@ jobs:
             --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
             .
 
-      - name: 校验内部镜像的交付形态（拉本机架构）
+      - name: 校验内部镜像的交付形态（拉门禁架构）
         run: |
           set -euo pipefail
           IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
-          # 多架构 tag 拉取必须指定 --platform，否则 docker 会取默认架构或报
-          # "no matching manifest"；这里固定拉 runner 本机架构做门禁。
-          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
-          # 内部镜像的预期：源码在、没有 integrity.json、没有 .so。
-          # 不做 create_app()：那需要真实的 PG/Redis，CI 里没有，会让门禁假红。
-          docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint sh "${IMG}" -c '
+          docker pull --platform "${{ steps.plat.outputs.gate }}" "${IMG}"
+          docker run --rm --platform "${{ steps.plat.outputs.gate }}" --entrypoint sh "${IMG}" -c '
           set -e
           test -f /home/main.py || { echo "缺少 /home/main.py" >&2; exit 1; }
           test -f /home/app/factory.py || { echo "内部镜像应保留源码，但 app/factory.py 不存在" >&2; exit 1; }
@@ -290,9 +290,10 @@ jobs:
             || { echo "LICENSE_INTEGRITY_PUBKEY 必须是 base64 编码的 ed25519 raw 32 字节公钥" >&2; exit 1; }
           echo "${CA_SHA256}" | grep -Eqx '[0-9a-f]{64}' \
             || { echo "inputs.license_ca_sha256 必须是 64 位小写十六进制" >&2; exit 1; }
-          # 服务端 URL 会被写进镜像并被客户端拿去连授权服务，形状错了等于发个连不上的镜像
           echo "${SERVER_URL}" | grep -Eqx 'https?://[^[:space:]]+' \
             || { echo "inputs.license_server_url 必须是 http(s):// 开头的完整地址" >&2; exit 1; }
+          echo "${SERVER_URL}" | grep -Eq 'https?://[^/:]+:[0-9]+' \
+            || { echo "inputs.license_server_url 必须包含显式端口（如 https://172.16.11.199:8443），避免默认连 443" >&2; exit 1; }
           echo "配置形状校验通过"
 
       - name: 解析构建平台
@@ -302,18 +303,22 @@ jobs:
           PLATFORMS="${{ github.event.inputs.platforms }}"
           [ -n "${PLATFORMS}" ] || PLATFORMS="linux/amd64"
           echo "platforms=${PLATFORMS}" >> "$GITHUB_OUTPUT"
-          if [ "${RUNNER_ARCH}" = "ARM64" ]; then
-            NATIVE="linux/arm64"
+
+          if [ "${PLATFORMS}" = "linux/arm64" ]; then
+            GATE="linux/arm64"
+          elif [ "${PLATFORMS}" = "linux/amd64" ]; then
+            GATE="linux/amd64"
           else
-            NATIVE="linux/amd64"
+            GATE="linux/amd64"
           fi
-          echo "native=${NATIVE}" >> "$GITHUB_OUTPUT"
+          echo "gate=${GATE}" >> "$GITHUB_OUTPUT"
+
           if [ "${RUNNER_ARCH}" != "ARM64" ] && echo "${PLATFORMS}" | grep -q arm64; then
             echo "need_qemu=true" >> "$GITHUB_OUTPUT"
           else
             echo "need_qemu=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "目标架构: ${PLATFORMS} / runner: ${NATIVE}"
+          echo "目标架构: ${PLATFORMS} / 门禁: ${GATE}"
 
       - name: 计算版本信息
         id: meta
@@ -397,13 +402,13 @@ jobs:
         if: always()
         run: rm -f "${RUNNER_TEMP}/license_signing_key"
 
-      - name: 校验交付形态（拉本机架构：源码已删 / .so 齐全 / 无字节码残留）
+      - name: 校验交付形态（拉门禁架构：源码已删 / .so 齐全 / 无字节码残留）
         run: |
           set -euo pipefail
           IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
-          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          docker pull --platform "${{ steps.plat.outputs.gate }}" "${IMG}"
           # 期望输出：compiled: 56 plaintext: 5 missing: [] stale sources: []
-          docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint python "${IMG}" -c '
+          docker run --rm --platform "${{ steps.plat.outputs.gate }}" --entrypoint python "${IMG}" -c '
           import json
           from app.core.license.integrity import default_manifest_path
 
@@ -471,18 +476,22 @@ jobs:
           PLATFORMS="${{ github.event.inputs.platforms }}"
           [ -n "${PLATFORMS}" ] || PLATFORMS="linux/amd64"
           echo "platforms=${PLATFORMS}" >> "$GITHUB_OUTPUT"
-          if [ "${RUNNER_ARCH}" = "ARM64" ]; then
-            NATIVE="linux/arm64"
+
+          if [ "${PLATFORMS}" = "linux/arm64" ]; then
+            GATE="linux/arm64"
+          elif [ "${PLATFORMS}" = "linux/amd64" ]; then
+            GATE="linux/amd64"
           else
-            NATIVE="linux/amd64"
+            GATE="linux/amd64"
           fi
-          echo "native=${NATIVE}" >> "$GITHUB_OUTPUT"
+          echo "gate=${GATE}" >> "$GITHUB_OUTPUT"
+
           if [ "${RUNNER_ARCH}" != "ARM64" ] && echo "${PLATFORMS}" | grep -q arm64; then
             echo "need_qemu=true" >> "$GITHUB_OUTPUT"
           else
             echo "need_qemu=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "目标架构: ${PLATFORMS} / runner: ${NATIVE}"
+          echo "目标架构: ${PLATFORMS} / 门禁: ${GATE}"
 
       - name: 计算版本信息
         id: meta
@@ -592,10 +601,8 @@ jobs:
         run: |
           set -euo pipefail
           IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend:${{ steps.meta.outputs.staging }}"
-          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
-          # nginx -t 会加载 conf.d/default.conf：配置写错（比如 upstream 主机名解析、
-          # 正则 location 冲突）在这一步就会失败，不用等起容器。
-          docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint sh "${IMG}" -c '
+          docker pull --platform "${{ steps.plat.outputs.gate }}" "${IMG}"
+          docker run --rm --platform "${{ steps.plat.outputs.gate }}" --entrypoint sh "${IMG}" -c '
           set -e
           test -f /usr/share/nginx/html/web/index.html || { echo "镜像里没有 index.html" >&2; exit 1; }
           nginx -t
