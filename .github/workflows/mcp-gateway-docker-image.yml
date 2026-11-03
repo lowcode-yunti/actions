@@ -35,9 +35,16 @@
 # 跨架构注意：
 #   - 请求 arm64 时（runner 是 amd64）需要 QEMU，下面按需启用；
 #   - backend 的客户构建（COMPILE=1）编译的是原生 .so，arm64 走 QEMU 会明显变慢。
-#     要快就单独触发一次 platforms=linux/arm64 并换 ARM runner（runs-on: ubuntu-24.04-arm），
-#     两个架构分别推同一 tag；提升那一步会检测到 tag 已存在并改用 --append，
-#     把第二种架构追加进 manifest list（本地实测 amd64+arm64 → ['amd64','arm64']）。
+#     要快就单独触发一次 platforms=linux/arm64 并换 ARM runner（runs-on: ubuntu-24.04-arm）。
+#   - 分两次跑不同架构时，第二次会覆盖第一次的架构（manifest list 只保留本次架构）。
+#     需要两个架构都在，就一次选 linux/amd64,linux/arm64 构建。
+#
+# ⚠️ 提升 tag 时**不能**用 `imagetools create --append`：
+#   --append 不去重。同一 tag 重复发布会在 manifest list 里堆出
+#   ['amd64','arm64','amd64','arm64']，而 docker pull 只认**第一个**匹配项，
+#   实际拉到的仍是旧镜像。表现极具迷惑性：构建日志全部成功，容器里却还是旧参数
+#   （比如改了 LICENSE_SERVER_URL 但镜像里还是旧值）。这里一律用不带 --append 的
+#   create，整体替换目标 manifest。
 
 name: mcp-gateway-docker-image
 
@@ -165,30 +172,48 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: 构建并推送 staging 镜像
+      - name: 构建（--load，多架构时跳过推送，改推 staging）
         run: |
           set -euo pipefail
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
-          docker buildx build \
-            --platform "${{ steps.plat.outputs.platforms }}" \
-            --file docker/backend/Dockerfile \
+          CACHE_ARGS="--cache-from type=gha,scope=mcp-gateway-backend-internal --cache-to type=gha,mode=max,scope=mcp-gateway-backend-internal"
+          COMMON_ARGS="--file docker/backend/Dockerfile \
             --build-arg COMPILE=0 \
-            --build-arg "BUILD_ID=${{ steps.meta.outputs.sha }}" \
-            --build-arg "BUILD_COMMIT=${{ steps.meta.outputs.sha }}" \
+            --build-arg BUILD_ID=${{ steps.meta.outputs.sha }} \
+            --build-arg BUILD_COMMIT=${{ steps.meta.outputs.sha }} \
             --provenance=false \
-            --sbom=false \
-            --cache-from type=gha,scope=mcp-gateway-backend-internal \
-            --cache-to type=gha,mode=max,scope=mcp-gateway-backend-internal \
-            --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
-            .
+            --sbom=false"
+
+          if echo "${PLATFORMS}" | grep -q ','; then
+            # 多架构：--load 不支持，直接推 staging，后面校验 + 复制 manifest
+            docker buildx build \
+              --platform "${PLATFORMS}" \
+              ${COMMON_ARGS} ${CACHE_ARGS} \
+              --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
+              .
+          else
+            # 单架构：--load 到本地，校验通过才推，坏镜像不落仓库
+            docker buildx build \
+              --platform "${PLATFORMS}" \
+              ${COMMON_ARGS} ${CACHE_ARGS} \
+              --load \
+              --tag "local/backend-internal:${{ steps.meta.outputs.tag }}" \
+              .
+          fi
 
       - name: 校验内部镜像的交付形态（拉本机架构）
         run: |
           set -euo pipefail
-          IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
-          # 多架构 tag 拉取必须指定 --platform，否则 docker 会取默认架构或报
-          # "no matching manifest"；这里固定拉 runner 本机架构做门禁。
-          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
+          if echo "${PLATFORMS}" | grep -q ','; then
+            # 多架构构建产物已经在 registry 的 staging tag 上，拉回本机架构
+            IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
+            docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          else
+            # 单架构走 --load，直接用本地镜像名，不必再拉一遍
+            IMG="local/backend-internal:${{ steps.meta.outputs.tag }}"
+          fi
           # 内部镜像的预期：源码在、没有 integrity.json、没有 .so。
           # 不做 create_app()：那需要真实的 PG/Redis，CI 里没有，会让门禁假红。
           docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint sh "${IMG}" -c '
@@ -207,30 +232,33 @@ jobs:
       - name: 提升为正式 tag
         run: |
           set -euo pipefail
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
-          SRC="${IMAGE}:${{ steps.meta.outputs.staging }}"
           TAG="${{ steps.meta.outputs.tag }}"
-          # --append 只在目标 tag 已存在时可用（分两次跑 amd64 / arm64 时，第二次要把
-          # 自己的架构追加进已有 manifest list，而不是覆盖成单架构）。
-          # 首次发布目标 tag 不存在，直接 create。
-          APPEND=""
-          if docker buildx imagetools inspect "${IMAGE}:internal-${TAG}" >/dev/null 2>&1; then
-            APPEND="--append"
-            echo "目标 tag 已存在，追加架构"
-          else
-            echo "目标 tag 不存在，首次创建"
-          fi
-          docker buildx imagetools create ${APPEND} \
-            -t "${IMAGE}:internal-${TAG}" \
-            -t "${IMAGE}:internal-${TAG}-${{ steps.meta.outputs.date }}" \
-            -t "${IMAGE}:${{ steps.meta.outputs.sha }}" \
-            "${SRC}"
+          TAGS=(
+            "${IMAGE}:internal-${TAG}"
+            "${IMAGE}:internal-${TAG}-${{ steps.meta.outputs.date }}"
+            "${IMAGE}:${{ steps.meta.outputs.sha }}"
+          )
 
-      - name: 打印多架构 manifest（确认两个架构都在）
-        run: |
-          set -euo pipefail
-          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:internal-${{ steps.meta.outputs.tag }}"
-          docker buildx imagetools inspect "${IMAGE}"
+          if echo "${PLATFORMS}" | grep -q ','; then
+            # 多架构：把 staging 的 manifest list 引用复制到正式 tag，不重推 layer。
+            # 用 create 不加 --append：--append 不去重，重复发布同一 tag 会在
+            # manifest list 里堆出 ['amd64','arm64','amd64','arm64']，
+            # 而 docker pull 命中**第一个**匹配项 → 实际拉到的还是旧镜像。
+            # 新构建已经覆盖了 staging tag（同 commit 同 staging 名），
+            # 直接 create 会整体替换目标 manifest，语义正确。
+            ARGS=()
+            for T in "${TAGS[@]}"; do ARGS+=(-t "$T"); done
+            docker buildx imagetools create "${ARGS[@]}" "${IMAGE}:${{ steps.meta.outputs.staging }}"
+          else
+            # 单架构：本地镜像直接 tag + push
+            SRC="local/backend-internal:${TAG}"
+            for T in "${TAGS[@]}"; do
+              docker tag "${SRC}" "$T"
+              docker push "$T"
+            done
+          fi
 
   # ==========================================================================
   # 客户构建：COMPILE=1 + LICENSE_ENFORCED=1
@@ -369,29 +397,37 @@ jobs:
             BUILD_ID="${{ steps.meta.outputs.sha }}"
           fi
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
           # --no-cache-filter builder 不是优化开关，是**正确性**要求：
           # 命中暖缓存时那条带 secret 的 RUN 根本不会执行，你会拿到上一把私钥
           # 签的 integrity.json。
           # 注意：多架构下这个 filter 对每个平台都生效，arm64 走 QEMU 时 Cython
           # 编译会明显变慢（这正是源仓库那些 arm workflow 的耗时来源）。
-          docker buildx build \
-            --platform "${{ steps.plat.outputs.platforms }}" \
-            --file docker/backend/Dockerfile \
+          COMMON_ARGS="--file docker/backend/Dockerfile \
             --no-cache-filter builder \
             --build-arg COMPILE=1 \
             --build-arg LICENSE_ENFORCED=1 \
-            --build-arg "LICENSE_SERVER_URL=${LICENSE_SERVER_URL}" \
-            --build-arg "LICENSE_CA_SHA256=${LICENSE_CA_SHA256}" \
-            --build-arg "LICENSE_INTEGRITY_PUBKEY=${LICENSE_INTEGRITY_PUBKEY}" \
-            --build-arg "BUILD_ID=${BUILD_ID}" \
-            --build-arg "BUILD_COMMIT=${{ steps.meta.outputs.sha }}" \
-            --secret "id=license_signing_key,src=${RUNNER_TEMP}/license_signing_key" \
+            --build-arg LICENSE_SERVER_URL=${LICENSE_SERVER_URL} \
+            --build-arg LICENSE_CA_SHA256=${LICENSE_CA_SHA256} \
+            --build-arg LICENSE_INTEGRITY_PUBKEY=${LICENSE_INTEGRITY_PUBKEY} \
+            --build-arg BUILD_ID=${BUILD_ID} \
+            --build-arg BUILD_COMMIT=${{ steps.meta.outputs.sha }} \
+            --secret id=license_signing_key,src=${RUNNER_TEMP}/license_signing_key \
             --provenance=false \
             --sbom=false \
             --cache-from type=gha,scope=mcp-gateway-backend-customer \
-            --cache-to type=gha,mode=max,scope=mcp-gateway-backend-customer \
-            --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
-            .
+            --cache-to type=gha,mode=max,scope=mcp-gateway-backend-customer"
+
+          if echo "${PLATFORMS}" | grep -q ','; then
+            docker buildx build --platform "${PLATFORMS}" ${COMMON_ARGS} \
+              --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
+              .
+          else
+            docker buildx build --platform "${PLATFORMS}" ${COMMON_ARGS} \
+              --load \
+              --tag "local/backend-customer:${{ steps.meta.outputs.tag }}" \
+              .
+          fi
 
       - name: 清掉私钥
         if: always()
@@ -400,8 +436,13 @@ jobs:
       - name: 校验交付形态（拉本机架构：源码已删 / .so 齐全 / 无字节码残留）
         run: |
           set -euo pipefail
-          IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
-          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
+          if echo "${PLATFORMS}" | grep -q ','; then
+            IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
+            docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          else
+            IMG="local/backend-customer:${{ steps.meta.outputs.tag }}"
+          fi
           # 期望输出：compiled: 56 plaintext: 5 missing: [] stale sources: []
           docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint python "${IMG}" -c '
           import json
@@ -428,18 +469,21 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
-          SRC="${IMAGE}:${{ steps.meta.outputs.staging }}"
           TAG="${{ steps.meta.outputs.tag }}"
-          # 同 backend：目标 tag 已存在则追加架构，否则首次创建
-          APPEND=""
-          if docker buildx imagetools inspect "${IMAGE}:customer-${TAG}" >/dev/null 2>&1; then
-            APPEND="--append"
-            echo "目标 tag 已存在，追加架构"
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
+          if echo "${PLATFORMS}" | grep -q ','; then
+            # 不加 --append，理由同 internal job
+            docker buildx imagetools create \
+              -t "${IMAGE}:customer-${TAG}" \
+              -t "${IMAGE}:customer-${TAG}-${{ steps.meta.outputs.date }}" \
+              "${IMAGE}:${{ steps.meta.outputs.staging }}"
+          else
+            SRC="local/backend-customer:${TAG}"
+            for T in "${IMAGE}:customer-${TAG}" "${IMAGE}:customer-${TAG}-${{ steps.meta.outputs.date }}"; do
+              docker tag "${SRC}" "$T"
+              docker push "$T"
+            done
           fi
-          docker buildx imagetools create ${APPEND} \
-            -t "${IMAGE}:customer-${TAG}" \
-            -t "${IMAGE}:customer-${TAG}-${{ steps.meta.outputs.date }}" \
-            "${SRC}"
 
       - name: 打印多架构 manifest
         run: |
@@ -578,21 +622,32 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend"
-          docker buildx build \
-            --platform "${{ steps.plat.outputs.platforms }}" \
-            --file .ci/web/Dockerfile \
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
+          COMMON_ARGS="--file .ci/web/Dockerfile \
             --provenance=false \
             --sbom=false \
             --cache-from type=gha,scope=mcp-gateway-frontend \
-            --cache-to type=gha,mode=max,scope=mcp-gateway-frontend \
-            --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
-            .ci/web
+            --cache-to type=gha,mode=max,scope=mcp-gateway-frontend"
+          if echo "${PLATFORMS}" | grep -q ','; then
+            docker buildx build --platform "${PLATFORMS}" ${COMMON_ARGS} \
+              --output "type=image,name=${IMAGE}:${{ steps.meta.outputs.staging }},push=true,oci-mediatypes=false" \
+              .ci/web
+          else
+            docker buildx build --platform "${PLATFORMS}" ${COMMON_ARGS} \
+              --load --tag "local/frontend:${{ steps.meta.outputs.tag }}" \
+              .ci/web
+          fi
 
       - name: 校验镜像（配置语法 + 产物存在）
         run: |
           set -euo pipefail
-          IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend:${{ steps.meta.outputs.staging }}"
-          docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
+          if echo "${PLATFORMS}" | grep -q ','; then
+            IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend:${{ steps.meta.outputs.staging }}"
+            docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+          else
+            IMG="local/frontend:${{ steps.meta.outputs.tag }}"
+          fi
           # nginx -t 会加载 conf.d/default.conf：配置写错（比如 upstream 主机名解析、
           # 正则 location 冲突）在这一步就会失败，不用等起容器。
           docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint sh "${IMG}" -c '
@@ -605,22 +660,30 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend"
-          SRC="${IMAGE}:${{ steps.meta.outputs.staging }}"
           TAG="${{ steps.meta.outputs.tag }}"
-          # 同 backend：目标 tag 已存在则追加架构，否则首次创建
-          APPEND=""
-          if docker buildx imagetools inspect "${IMAGE}:${TAG}" >/dev/null 2>&1; then
-            APPEND="--append"
-            echo "目标 tag 已存在，追加架构"
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
+          if echo "${PLATFORMS}" | grep -q ','; then
+            # 不加 --append，理由同 backend：--append 会堆重复架构条目，
+            # docker pull 只认第一个匹配项，导致「重建了但拉到的还是旧镜像」。
+            docker buildx imagetools create \
+              -t "${IMAGE}:${TAG}" \
+              -t "${IMAGE}:${TAG}-${{ steps.meta.outputs.date }}" \
+              -t "${IMAGE}:${{ steps.meta.outputs.sha }}" \
+              "${IMAGE}:${{ steps.meta.outputs.staging }}"
+          else
+            SRC="local/frontend:${TAG}"
+            for T in "${IMAGE}:${TAG}" "${IMAGE}:${TAG}-${{ steps.meta.outputs.date }}" "${IMAGE}:${{ steps.meta.outputs.sha }}"; do
+              docker tag "${SRC}" "$T"
+              docker push "$T"
+            done
           fi
-          docker buildx imagetools create ${APPEND} \
-            -t "${IMAGE}:${TAG}" \
-            -t "${IMAGE}:${TAG}-${{ steps.meta.outputs.date }}" \
-            -t "${IMAGE}:${{ steps.meta.outputs.sha }}" \
-            "${SRC}"
 
-      - name: 打印多架构 manifest
+      - name: 打印 manifest（确认架构正确）
         run: |
           set -euo pipefail
-          IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend:${{ steps.meta.outputs.tag }}"
-          docker buildx imagetools inspect "${IMAGE}"
+          PLATFORMS="${{ steps.plat.outputs.platforms }}"
+          if echo "${PLATFORMS}" | grep -q ','; then
+            docker buildx imagetools inspect "${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend:${{ steps.meta.outputs.tag }}"
+          else
+            echo "单架构构建（${PLATFORMS}），无 manifest list"
+          fi
