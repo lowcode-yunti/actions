@@ -373,6 +373,10 @@ jobs:
           if [ -z "${BUILD_ID}" ]; then
             BUILD_ID="${{ steps.meta.outputs.sha }}"
           fi
+          # BuildKit 构建日志里通常不会出现 --build-arg 明文；在这里打一行便于 Actions 里核对。
+          echo "customer build LICENSE_SERVER_URL=${LICENSE_SERVER_URL}"
+          echo "customer build LICENSE_CA_SHA256=${LICENSE_CA_SHA256:0:16}… (len=${#LICENSE_CA_SHA256})"
+          echo "customer build BUILD_ID=${BUILD_ID}"
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
           # --no-cache-filter builder 不是优化开关，是**正确性**要求：
           # 命中暖缓存时那条带 secret 的 RUN 根本不会执行，你会拿到上一把私钥
@@ -410,7 +414,15 @@ jobs:
           # 期望输出：compiled: 56 plaintext: 5 missing: [] stale sources: []
           docker run --rm --platform "${{ steps.plat.outputs.gate }}" --entrypoint python "${IMG}" -c '
           import json
+          from urllib.parse import urlparse
+          from app.core.license import flags
           from app.core.license.integrity import default_manifest_path
+
+          u = urlparse(flags.SERVER_URL)
+          print("SERVER_URL:", flags.SERVER_URL)
+          if u.port is None:
+              raise SystemExit(f"镜像内 SERVER_URL 未带端口（会连 443）: {flags.SERVER_URL!r}")
+          print("SERVER_URL_OK port=", u.port)
 
           manifest = default_manifest_path()
           root = manifest.parents[3]
