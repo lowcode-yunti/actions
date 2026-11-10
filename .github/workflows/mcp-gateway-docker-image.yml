@@ -534,10 +534,12 @@ jobs:
               raise SystemExit("镜像内 PLUGIN_SIGNING_PUBKEY 非空但 PLUGIN_TENANT 为空")
           if plugin_tenant and not plugin_pubkey:
               raise SystemExit("镜像内 PLUGIN_TENANT 非空但 PLUGIN_SIGNING_PUBKEY 为空")
+          # 注意：整段 python -c 包在 shell 单引号里，fallback 字符串只能用双引号，
+          # 否则 bash 会把单引号当结束符，把表达式截成 or -。
           print(
               "plugin_signing:",
               "enabled" if plugin_pubkey else "disabled",
-              f"tenant={plugin_tenant or '-'}",
+              "tenant=" + (plugin_tenant or "-"),
           )
 
           manifest = default_manifest_path()
