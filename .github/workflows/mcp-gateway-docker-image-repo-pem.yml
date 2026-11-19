@@ -75,7 +75,7 @@ on:
         type: string
         default: ""
       image_tag:
-        description: "镜像 tag 段（留空用 git sha12）。内部→internal-<tag>；客户→customer-<tag>；前端→<tag>。客户构建建议填客户/环境代号（如 acme、acme-prod），仅作运维标签，不再编进 PLUGIN_TENANT"
+        description: "镜像 tag 段（留空用源码分支名，/ 换成 -，如 feat-code-protection）。内部→internal-<tag>；客户→customer-<tag>；前端→<tag>。也可填客户/环境代号（acme、acme-prod），仅作运维标签，不再编进 PLUGIN_TENANT"
         type: string
         default: ""
 
@@ -83,7 +83,7 @@ on:
 # image_tag 进 group：不同客户/环境可并行；同 tag 重复触发才取消旧的。
 # 架构必须进 group：amd64 和 arm64 分两次跑时不能互相取消。
 concurrency:
-  group: mcp-gateway-repo-pem-${{ github.event.inputs.variant || 'all' }}-${{ github.event.inputs.ref || 'default' }}-${{ github.event.inputs.platforms || 'linux/amd64' }}-${{ github.event.inputs.image_tag || 'sha' }}
+  group: mcp-gateway-repo-pem-${{ github.event.inputs.variant || 'all' }}-${{ github.event.inputs.ref || 'default' }}-${{ github.event.inputs.platforms || 'linux/amd64' }}-${{ github.event.inputs.image_tag || 'branch' }}
   cancel-in-progress: true
 
 env:
@@ -141,8 +141,18 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ github.event.inputs.image_tag }}"
+          TAG="$(printf '%s' "${TAG}" | tr -d '[:space:]')"
           if [ -z "${TAG}" ]; then
-            TAG="$(git rev-parse --short=12 HEAD)"
+            # 留空：用检出分支名；Docker tag 不允许 /:
+            TAG="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+            if [ -z "${TAG}" ] || [ "${TAG}" = "HEAD" ]; then
+              TAG="${{ github.event.inputs.ref || env.BRANCH_NAME }}"
+            fi
+            TAG="$(printf '%s' "${TAG}" | tr '/:' '-' | tr -cd 'A-Za-z0-9._-')"
+          fi
+          if [ -z "${TAG}" ] || ! printf '%s' "${TAG}" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'; then
+            echo "无法从 image_tag/分支得到合法 Docker tag 段：${TAG:-空}" >&2
+            exit 1
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "date=$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')" >> "$GITHUB_OUTPUT"
@@ -260,8 +270,8 @@ jobs:
   # 授权已改为离线 license.bin + k3s kube-system UID（不再钉 CA / 调 license-server）。
   #
   # 每次触发时在 inputs 里填（「这次构建的发布参数」，不该固化成仓库级配置）：
-  #   inputs.image_tag            正式 tag 段 → customer-<tag>（留空用 sha12）
-  #                               BUILD_ID：有 tag → <tag>-YYYYMMDD，否则 YYYYMMDD-<sha12>
+  #   inputs.image_tag            正式 tag 段 → customer-<tag>（留空用分支名，/ → -）
+  #                               BUILD_ID：<tag>-YYYYMMDD
   #                               注意：image_tag 只是运维标签，不再编进 flags；插件绑定改由
   #                               运行时 cluster_uid（pack --cluster-uid），一集群一插件包。
   #
@@ -360,17 +370,21 @@ jobs:
           set -euo pipefail
           TAG="${{ github.event.inputs.image_tag }}"
           TAG="$(printf '%s' "${TAG}" | tr -d '[:space:]')"
-          # Docker tag 只允许 [A-Za-z0-9._-]；形状不对就提前失败。
-          if [ -n "${TAG}" ] && ! printf '%s' "${TAG}" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'; then
-            echo "inputs.image_tag 不能作为镜像 tag 段：${TAG}（仅允许字母数字开头，后接 ._-，最长 64）" >&2
-            exit 1
-          fi
           SHA12="$(git rev-parse --short=12 HEAD)"
           if [ -z "${TAG}" ]; then
-            TAG="${SHA12}"
+            # 留空：用检出分支名；Docker tag 不允许 /:
+            TAG="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+            if [ -z "${TAG}" ] || [ "${TAG}" = "HEAD" ]; then
+              TAG="${{ github.event.inputs.ref || env.BRANCH_NAME }}"
+            fi
+            TAG="$(printf '%s' "${TAG}" | tr '/:' '-' | tr -cd 'A-Za-z0-9._-')"
           fi
-          # 每客户/环境一个稳定 tag（不带 sha）：customer-acme / customer-acme-prod
-          # 同日多次构建用带时间戳的副本回溯；staging 仍带 sha，避免未提升前互相踩。
+          # Docker tag 只允许 [A-Za-z0-9._-]；形状不对就提前失败。
+          if [ -z "${TAG}" ] || ! printf '%s' "${TAG}" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'; then
+            echo "无法从 image_tag/分支得到合法 Docker tag 段：${TAG:-空}（仅允许字母数字开头，后接 ._-，最长 64）" >&2
+            exit 1
+          fi
+          # 稳定 tag：customer-<image_tag|分支>；同日多次构建用带时间戳副本；staging 带 sha。
           RELEASE="customer-${TAG}"
           STAGING="staging-customer-${TAG}-${SHA12}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
@@ -417,15 +431,9 @@ jobs:
         run: |
           set -euo pipefail
           PLUGIN_SIGNING_PUBKEY="$(printf '%s' "${PLUGIN_SIGNING_PUBKEY}" | tr -d '[:space:]')"
-          # BUILD_ID 是可变水印（非插件绑定）：有 image_tag → <tag>-YYYYMMDD，否则 YYYYMMDD-<sha12>
+          # BUILD_ID 是可变水印（非插件绑定）：<tag>-YYYYMMDD（tag=image_tag 或分支）
           TAG="${{ steps.meta.outputs.tag }}"
-          DAY="$(TZ=Asia/Shanghai date +%Y%m%d)"
-          INPUT_TAG="$(printf '%s' "${{ github.event.inputs.image_tag }}" | tr -d '[:space:]')"
-          if [ -n "${INPUT_TAG}" ]; then
-            BUILD_ID="${TAG}-${DAY}"
-          else
-            BUILD_ID="${DAY}-${TAG}"
-          fi
+          BUILD_ID="${TAG}-$(TZ=Asia/Shanghai date +%Y%m%d)"
           # BuildKit 构建日志里通常不会出现 --build-arg 明文；在这里打一行便于 Actions 里核对。
           echo "customer build LICENSE_PUBLIC_KEY_PEM=baked-in-repo-flags"
           echo "customer build BUILD_ID=${BUILD_ID}"
@@ -538,7 +546,7 @@ jobs:
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
           RELEASE="${{ steps.meta.outputs.release }}"
           PLATFORMS="${{ steps.plat.outputs.platforms }}"
-          # 正式 tag 为 customer-<image_tag|sha12>；带时间戳的副本便于回溯同日多次构建。
+          # 正式 tag 为 customer-<image_tag|分支>；带时间戳的副本便于回溯同日多次构建。
           TAGS=(
             "${IMAGE}:${RELEASE}"
             "${IMAGE}:${RELEASE}-${{ steps.meta.outputs.date }}"
@@ -608,8 +616,17 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ github.event.inputs.image_tag }}"
+          TAG="$(printf '%s' "${TAG}" | tr -d '[:space:]')"
           if [ -z "${TAG}" ]; then
-            TAG="$(git rev-parse --short=12 HEAD)"
+            TAG="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+            if [ -z "${TAG}" ] || [ "${TAG}" = "HEAD" ]; then
+              TAG="${{ github.event.inputs.ref || env.BRANCH_NAME }}"
+            fi
+            TAG="$(printf '%s' "${TAG}" | tr '/:' '-' | tr -cd 'A-Za-z0-9._-')"
+          fi
+          if [ -z "${TAG}" ] || ! printf '%s' "${TAG}" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'; then
+            echo "无法从 image_tag/分支得到合法 Docker tag 段：${TAG:-空}" >&2
+            exit 1
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "date=$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')" >> "$GITHUB_OUTPUT"
