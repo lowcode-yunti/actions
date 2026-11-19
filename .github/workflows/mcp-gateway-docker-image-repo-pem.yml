@@ -75,20 +75,15 @@ on:
         type: string
         default: ""
       image_tag:
-        description: "镜像 tag（内部/前端用；客户构建忽略此项，正式 tag 固定为 customer-<tenant>）"
+        description: "镜像 tag 段（留空用 git sha12）。内部→internal-<tag>；客户→customer-<tag>；前端→<tag>。客户构建建议填客户/环境代号（如 acme、acme-prod），仅作运维标签，不再编进 PLUGIN_TENANT"
         type: string
-        default: ""
-      plugin_tenant:
-        description: "客户构建的 PLUGIN_TENANT（客户代号，不含日期，如 acme；与 vars.PLUGIN_SIGNING_PUBKEY 成对；都空=不启用插件签名）。正式镜像 tag=customer-<tenant>，BUILD_ID=<tenant>-YYYYMMDD"
-        type: string
-        required: false
         default: ""
 
-# 同一 ref + variant + 架构 + tenant 重复触发时取消上一次未完成的构建。
-# tenant 必须进 group：不同客户可并行构建，不能互相取消；同客户重复触发才取消旧的。
+# 同一 ref + variant + 架构 + image_tag 重复触发时取消上一次未完成的构建。
+# image_tag 进 group：不同客户/环境可并行；同 tag 重复触发才取消旧的。
 # 架构必须进 group：amd64 和 arm64 分两次跑时不能互相取消。
 concurrency:
-  group: mcp-gateway-repo-pem-${{ github.event.inputs.variant || 'all' }}-${{ github.event.inputs.ref || 'default' }}-${{ github.event.inputs.platforms || 'linux/amd64' }}-${{ github.event.inputs.plugin_tenant || 'no-tenant' }}
+  group: mcp-gateway-repo-pem-${{ github.event.inputs.variant || 'all' }}-${{ github.event.inputs.ref || 'default' }}-${{ github.event.inputs.platforms || 'linux/amd64' }}-${{ github.event.inputs.image_tag || 'sha' }}
   cancel-in-progress: true
 
 env:
@@ -208,14 +203,14 @@ jobs:
           if echo "${PLATFORMS}" | grep -q ','; then
             # 多架构构建产物已经在 registry 的 staging tag 上，拉回本机架构
             IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
-            docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+            docker pull --platform "${{ steps.plat.outputs.gate }}" "${IMG}"
           else
             # 单架构走 --load，直接用本地镜像名，不必再拉一遍
             IMG="local/backend-internal:${{ steps.meta.outputs.tag }}"
           fi
           # 内部镜像的预期：源码在、没有 integrity.json、没有 .so。
           # 不做 create_app()：那需要真实的 PG/Redis，CI 里没有，会让门禁假红。
-          docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint sh "${IMG}" -c '
+          docker run --rm --platform "${{ steps.plat.outputs.gate }}" --entrypoint sh "${IMG}" -c '
           set -e
           test -f /home/main.py || { echo "缺少 /home/main.py" >&2; exit 1; }
           test -f /home/app/factory.py || { echo "内部镜像应保留源码，但 app/factory.py 不存在" >&2; exit 1; }
@@ -265,18 +260,20 @@ jobs:
   # 授权已改为离线 license.bin + k3s kube-system UID（不再钉 CA / 调 license-server）。
   #
   # 每次触发时在 inputs 里填（「这次构建的发布参数」，不该固化成仓库级配置）：
-  #   inputs.plugin_tenant        PLUGIN_TENANT（客户代号，不含日期；与公钥成对）
-  #                               BUILD_ID 不单独输入：有 tenant → <tenant>-YYYYMMDD，否则 commit sha
+  #   inputs.image_tag            正式 tag 段 → customer-<tag>（留空用 sha12）
+  #                               BUILD_ID：有 tag → <tag>-YYYYMMDD，否则 YYYYMMDD-<sha12>
+  #                               注意：image_tag 只是运维标签，不再编进 flags；插件绑定改由
+  #                               运行时 cluster_uid（pack --cluster-uid），一集群一插件包。
   #
   # 仓库级 secrets / vars（凭据，不能进 inputs——inputs 会出现在 run 记录与 API）：
   #   secrets.LICENSE_SIGNING_KEY      integrity.json 签名用 ed25519 raw seed 的 base64
   #                                    （只落盘到 $RUNNER_TEMP，绝不进构建上下文/镜像层）
   #   vars.LICENSE_INTEGRITY_PUBKEY    integrity 公钥 base64（32 字节 raw）
   #   vars.PLUGIN_SIGNING_PUBKEY       插件包签名公钥 base64（与上两把钥匙分离；
-  #                                    私钥只在打包机，不进 CI）
+  #                                    私钥只在打包机，不进 CI；空=不启用插件签名）
   # 产品授权公钥已内置在源仓库 flags.py，不再需要 vars.LICENSE_PUBLIC_KEY_PEM。
+  # 已删除：inputs.plugin_tenant / PLUGIN_TENANT build-arg（镜像不再按租户绑插件）。
   #
-  # 插件签名：公钥与 tenant 必须成对出现或都空（都空=不启用，安装/加载跳过验签）。
   # COMPILE=1 配 LICENSE_ENFORCED=0 是不可用组合（Dockerfile 会直接失败），
   # 所以客户构建固定两个都为 1。
   # ==========================================================================
@@ -299,7 +296,6 @@ jobs:
           SIGNING_KEY: ${{ secrets.LICENSE_SIGNING_KEY }}
           PUBKEY: ${{ vars.LICENSE_INTEGRITY_PUBKEY }}
           PLUGIN_PUBKEY: ${{ vars.PLUGIN_SIGNING_PUBKEY }}
-          PLUGIN_TENANT: ${{ github.event.inputs.plugin_tenant }}
         run: |
           set -euo pipefail
           missing=()
@@ -310,7 +306,7 @@ jobs:
             printf '  - %s\n' "${missing[@]}" >&2
             echo "提示：inputs 在触发 workflow 时的表单里填；secrets / vars 在" >&2
             echo "      Settings→Secrets and variables→Actions 配置。" >&2
-            echo "      已退役：vars.LICENSE_PUBLIC_KEY_PEM / inputs.license_server_url / license_ca_sha256。" >&2
+            echo "      已退役：vars.LICENSE_PUBLIC_KEY_PEM / inputs.plugin_tenant / PLUGIN_TENANT。" >&2
             exit 1
           fi
           # 只校验形状，不回显内容
@@ -323,23 +319,14 @@ jobs:
             || { echo "flags.py 缺少 LICENSE_PUBLIC_KEY_PEM" >&2; exit 1; }
           grep -q "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" backend/app/core/license/flags.py \
             && { echo "flags.py 仍是全零占位产品公钥，不能客户构建" >&2; exit 1; }
-          # 插件签名：公钥与 tenant 成对；都空=本次不启用（与 Dockerfile / build_flags 口径一致）
+          # 插件签名：仅公钥；空=不启用。绑定物是运行时 cluster_uid，不再要 tenant。
           PLUGIN_PUBKEY="$(printf '%s' "${PLUGIN_PUBKEY}" | tr -d '[:space:]')"
-          PLUGIN_TENANT="$(printf '%s' "${PLUGIN_TENANT}" | tr -d '[:space:]')"
-          if [ -n "${PLUGIN_PUBKEY}" ] && [ -z "${PLUGIN_TENANT}" ]; then
-            echo "提供了 vars.PLUGIN_SIGNING_PUBKEY 却未填 inputs.plugin_tenant：租户为空会让所有签名插件包装不上" >&2
-            exit 1
-          fi
-          if [ -z "${PLUGIN_PUBKEY}" ] && [ -n "${PLUGIN_TENANT}" ]; then
-            echo "填了 inputs.plugin_tenant 却未配置 vars.PLUGIN_SIGNING_PUBKEY：租户在未签名构建里不会被使用" >&2
-            exit 1
-          fi
           if [ -n "${PLUGIN_PUBKEY}" ]; then
             echo "${PLUGIN_PUBKEY}" | base64 -d | wc -c | grep -qx 32 \
               || { echo "PLUGIN_SIGNING_PUBKEY 必须是 base64 编码的 ed25519 raw 32 字节公钥" >&2; exit 1; }
-            echo "插件签名：enabled（tenant=${PLUGIN_TENANT}）"
+            echo "插件签名：enabled（绑定 cluster_uid，由 pack --cluster-uid）"
           else
-            echo "插件签名：disabled（公钥与 tenant 都空）"
+            echo "插件签名：disabled（vars.PLUGIN_SIGNING_PUBKEY 为空）"
           fi
           echo "配置形状校验通过"
 
@@ -369,28 +356,24 @@ jobs:
 
       - name: 计算版本信息
         id: meta
-        env:
-          PLUGIN_TENANT: ${{ github.event.inputs.plugin_tenant }}
         run: |
           set -euo pipefail
-          TENANT="$(printf '%s' "${PLUGIN_TENANT}" | tr -d '[:space:]')"
-          # Docker tag 只允许 [A-Za-z0-9._-]；租户进 tag，形状不对就提前失败。
-          if [ -n "${TENANT}" ] && ! printf '%s' "${TENANT}" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'; then
-            echo "inputs.plugin_tenant 不能作为镜像 tag 段：${TENANT}（仅允许字母数字开头，后接 ._-，最长 64）" >&2
+          TAG="${{ github.event.inputs.image_tag }}"
+          TAG="$(printf '%s' "${TAG}" | tr -d '[:space:]')"
+          # Docker tag 只允许 [A-Za-z0-9._-]；形状不对就提前失败。
+          if [ -n "${TAG}" ] && ! printf '%s' "${TAG}" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]{0,63}'; then
+            echo "inputs.image_tag 不能作为镜像 tag 段：${TAG}（仅允许字母数字开头，后接 ._-，最长 64）" >&2
             exit 1
           fi
           SHA12="$(git rev-parse --short=12 HEAD)"
-          if [ -n "${TENANT}" ]; then
-            # 每客户一个稳定 tag（不带 sha）：customer-acme
-            # 同日多次构建用带时间戳的副本回溯；staging 仍带 sha，避免未提升前互相踩。
-            RELEASE="customer-${TENANT}"
-            STAGING="staging-customer-${TENANT}-${SHA12}"
-          else
-            # 未填 tenant（不启用插件签名）时退回 sha，避免所有人抢同一个 customer 标签
-            RELEASE="customer-${SHA12}"
-            STAGING="staging-customer-${SHA12}"
+          if [ -z "${TAG}" ]; then
+            TAG="${SHA12}"
           fi
-          echo "tenant=${TENANT}" >> "$GITHUB_OUTPUT"
+          # 每客户/环境一个稳定 tag（不带 sha）：customer-acme / customer-acme-prod
+          # 同日多次构建用带时间戳的副本回溯；staging 仍带 sha，避免未提升前互相踩。
+          RELEASE="customer-${TAG}"
+          STAGING="staging-customer-${TAG}-${SHA12}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "release=${RELEASE}" >> "$GITHUB_OUTPUT"
           echo "date=$(TZ=Asia/Shanghai date +'%Y-%m-%d-%H-%M-%S')" >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -431,24 +414,23 @@ jobs:
         env:
           LICENSE_INTEGRITY_PUBKEY: ${{ vars.LICENSE_INTEGRITY_PUBKEY }}
           PLUGIN_SIGNING_PUBKEY: ${{ vars.PLUGIN_SIGNING_PUBKEY }}
-          PLUGIN_TENANT: ${{ github.event.inputs.plugin_tenant }}
         run: |
           set -euo pipefail
           PLUGIN_SIGNING_PUBKEY="$(printf '%s' "${PLUGIN_SIGNING_PUBKEY}" | tr -d '[:space:]')"
-          PLUGIN_TENANT="$(printf '%s' "${PLUGIN_TENANT}" | tr -d '[:space:]')"
-          # BUILD_ID 是可变水印，PLUGIN_TENANT 是签名绑定：不提供单独 input，一律自动生成。
-          #   有 tenant → <tenant>-YYYYMMDD（上海时区）
-          #   无 tenant → commit sha（未启用插件签名的客户构建兜底）
-          if [ -n "${PLUGIN_TENANT}" ]; then
-            BUILD_ID="${PLUGIN_TENANT}-$(TZ=Asia/Shanghai date +%Y%m%d)"
+          # BUILD_ID 是可变水印（非插件绑定）：有 image_tag → <tag>-YYYYMMDD，否则 YYYYMMDD-<sha12>
+          TAG="${{ steps.meta.outputs.tag }}"
+          DAY="$(TZ=Asia/Shanghai date +%Y%m%d)"
+          INPUT_TAG="$(printf '%s' "${{ github.event.inputs.image_tag }}" | tr -d '[:space:]')"
+          if [ -n "${INPUT_TAG}" ]; then
+            BUILD_ID="${TAG}-${DAY}"
           else
-            BUILD_ID="${{ steps.meta.outputs.sha }}"
+            BUILD_ID="${DAY}-${TAG}"
           fi
           # BuildKit 构建日志里通常不会出现 --build-arg 明文；在这里打一行便于 Actions 里核对。
           echo "customer build LICENSE_PUBLIC_KEY_PEM=baked-in-repo-flags"
           echo "customer build BUILD_ID=${BUILD_ID}"
           if [ -n "${PLUGIN_SIGNING_PUBKEY}" ]; then
-            echo "customer build PLUGIN_SIGNING=enabled tenant=${PLUGIN_TENANT}"
+            echo "customer build PLUGIN_SIGNING=enabled (cluster_uid at pack/install)"
           else
             echo "customer build PLUGIN_SIGNING=disabled"
           fi
@@ -467,7 +449,6 @@ jobs:
             --build-arg LICENSE_ENFORCED=1
             --build-arg "LICENSE_INTEGRITY_PUBKEY=${LICENSE_INTEGRITY_PUBKEY}"
             --build-arg "PLUGIN_SIGNING_PUBKEY=${PLUGIN_SIGNING_PUBKEY}"
-            --build-arg "PLUGIN_TENANT=${PLUGIN_TENANT}"
             --build-arg "BUILD_ID=${BUILD_ID}"
             --build-arg "BUILD_COMMIT=${{ steps.meta.outputs.sha }}"
             --secret "id=license_signing_key,src=${RUNNER_TEMP}/license_signing_key"
@@ -498,7 +479,7 @@ jobs:
           PLATFORMS="${{ steps.plat.outputs.platforms }}"
           if echo "${PLATFORMS}" | grep -q ','; then
             IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend:${{ steps.meta.outputs.staging }}"
-            docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+            docker pull --platform "${{ steps.plat.outputs.gate }}" "${IMG}"
           else
             IMG="local/backend-customer:${{ steps.meta.outputs.release }}"
           fi
@@ -522,17 +503,13 @@ jobs:
           print("offline_license: ENFORCED=1 LICENSE_FILE=", license_file)
 
           plugin_pubkey = (flags.PLUGIN_SIGNING_PUBKEY or "").strip()
-          plugin_tenant = (flags.PLUGIN_TENANT or "").strip()
-          if plugin_pubkey and not plugin_tenant:
-              raise SystemExit("镜像内 PLUGIN_SIGNING_PUBKEY 非空但 PLUGIN_TENANT 为空")
-          if plugin_tenant and not plugin_pubkey:
-              raise SystemExit("镜像内 PLUGIN_TENANT 非空但 PLUGIN_SIGNING_PUBKEY 为空")
-          # 注意：整段 python -c 包在 shell 单引号里，fallback 字符串只能用双引号，
-          # 否则 bash 会把单引号当结束符，把表达式截成 or -。
+          if hasattr(flags, "PLUGIN_TENANT"):
+              raise SystemExit("镜像仍含 PLUGIN_TENANT：请改用已删除租户常量的源码分支")
+          # 注意：整段 python -c 包在 shell 单引号里，fallback 字符串只能用双引号。
           print(
               "plugin_signing:",
               "enabled" if plugin_pubkey else "disabled",
-              "tenant=" + (plugin_tenant or "-"),
+              "(cluster_uid at runtime)",
           )
 
           manifest = default_manifest_path()
@@ -561,7 +538,7 @@ jobs:
           IMAGE="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-backend"
           RELEASE="${{ steps.meta.outputs.release }}"
           PLATFORMS="${{ steps.plat.outputs.platforms }}"
-          # 正式 tag 为客户稳定名（customer-acme）；带时间戳的副本便于回溯同日多次构建。
+          # 正式 tag 为 customer-<image_tag|sha12>；带时间戳的副本便于回溯同日多次构建。
           TAGS=(
             "${IMAGE}:${RELEASE}"
             "${IMAGE}:${RELEASE}-${{ steps.meta.outputs.date }}"
@@ -742,13 +719,13 @@ jobs:
           PLATFORMS="${{ steps.plat.outputs.platforms }}"
           if echo "${PLATFORMS}" | grep -q ','; then
             IMG="${DOCKER_REGISTRY}/${DOCKER_IMAGE}-frontend:${{ steps.meta.outputs.staging }}"
-            docker pull --platform "${{ steps.plat.outputs.native }}" "${IMG}"
+            docker pull --platform "${{ steps.plat.outputs.gate }}" "${IMG}"
           else
             IMG="local/frontend:${{ steps.meta.outputs.tag }}"
           fi
           # nginx -t 会加载 conf.d/default.conf：配置写错（比如 upstream 主机名解析、
           # 正则 location 冲突）在这一步就会失败，不用等起容器。
-          docker run --rm --platform "${{ steps.plat.outputs.native }}" --entrypoint sh "${IMG}" -c '
+          docker run --rm --platform "${{ steps.plat.outputs.gate }}" --entrypoint sh "${IMG}" -c '
           set -e
           test -f /usr/share/nginx/html/web/index.html || { echo "镜像里没有 index.html" >&2; exit 1; }
           nginx -t
