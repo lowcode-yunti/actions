@@ -42,7 +42,8 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.15.3
+          # pnpm-workspace.yaml overrides 需 pnpm≥10
+          version: 10.28.0
 
       - uses: actions/setup-node@v4
         with:

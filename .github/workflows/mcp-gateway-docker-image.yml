@@ -647,7 +647,8 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           # 与 frontend/web/package.json 的 packageManager 一致
-          version: 9.15.3
+          # pnpm-workspace.yaml 的 overrides 需 pnpm≥10；与 lockfile 内 overrides 段对齐
+          version: 10.28.0
 
       - uses: actions/setup-node@v4
         with:
