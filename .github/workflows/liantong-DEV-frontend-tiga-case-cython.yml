@@ -54,6 +54,8 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           platforms: linux/arm64
+          provenance: false
+          sbom: false
           push: true
           build-args: |
            VITE_GENBI_MENU_ENABLED=true
