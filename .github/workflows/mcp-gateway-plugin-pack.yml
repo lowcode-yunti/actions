@@ -1,0 +1,184 @@
+# 打包 mcp_gateway 插件 zip（Cython 编译 + Ed25519 签名，绑定 cluster_uid）。
+#
+# 调用源仓库 plugins/<name>/pack.sh：
+#   ./plugins/<name>/pack.sh --protect --cluster-uid <uid> [--arch arm64|amd64]
+#
+# 产物：plugins/<name>/dist/<name>-<version>.zip → Actions artifact
+# 安装：客户后台「系统管理 → 插件管理 → 上传安装」
+#
+# 密钥：
+#   secrets.PLUGIN_SIGNING_KEY  ed25519 raw 32 字节 seed 的 base64（与 certs/plugin-signing.key 同格式）
+#                               只写到 $RUNNER_TEMP，不进 checkout / 镜像。
+# 公钥须已编进客户镜像的 vars.PLUGIN_SIGNING_PUBKEY / flags.PLUGIN_SIGNING_PUBKEY。
+#
+# 注意：
+#   - 一集群一包：cluster_uid 必须与目标集群授权页一致；换集群要重打。
+#   - arm64 在 amd64 runner 上走 QEMU，Cython 会明显变慢。
+
+name: mcp-gateway-plugin-pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: "插件名（plugins/ 下目录）"
+        type: choice
+        options: [workbuddy, seeyon]
+        default: workbuddy
+      cluster_uid:
+        description: "目标集群 kube-system Namespace UID（授权页复制；--protect 必填）"
+        type: string
+        required: true
+      arch:
+        description: "编译目标架构（须与客户镜像一致）"
+        type: choice
+        options: [arm64, amd64]
+        default: arm64
+      ref:
+        description: "源码分支（留空用 env.BRANCH_NAME）"
+        type: string
+        default: ""
+
+concurrency:
+  group: mcp-gateway-plugin-pack-${{ github.event.inputs.plugin }}-${{ github.event.inputs.arch }}-${{ github.event.inputs.cluster_uid }}-${{ github.event.inputs.ref || 'default' }}
+  cancel-in-progress: true
+
+env:
+  REPOSITORY: 'lowcode-yunti/mcp_gateway'
+  BRANCH_NAME: feat/code-protection
+
+jobs:
+  pack:
+    name: pack ${{ github.event.inputs.plugin }} (${{ github.event.inputs.arch }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ github.event.inputs.ref || env.BRANCH_NAME }}
+          token: ${{ secrets.ACTION_TOKEN }}
+
+      - name: 校验输入与密钥
+        env:
+          CLUSTER_UID: ${{ github.event.inputs.cluster_uid }}
+          PLUGIN: ${{ github.event.inputs.plugin }}
+          SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          CLUSTER_UID="$(printf '%s' "${CLUSTER_UID}" | tr -d '[:space:]')"
+          if [ -z "${CLUSTER_UID}" ]; then
+            echo "cluster_uid 不能为空" >&2
+            exit 1
+          fi
+          # UUID 形态粗检（允许非严格 UUID，但拒绝明显垃圾）
+          if ! printf '%s' "${CLUSTER_UID}" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]{7,127}'; then
+            echo "cluster_uid 形状不合法：${CLUSTER_UID}" >&2
+            exit 1
+          fi
+          echo "cluster_uid=${CLUSTER_UID}" >> "$GITHUB_ENV"
+
+          PACK="plugins/${PLUGIN}/pack.sh"
+          test -x "${PACK}" || test -f "${PACK}" || {
+            echo "找不到 ${PACK}" >&2
+            exit 1
+          }
+          chmod +x "${PACK}"
+
+          if [ -z "${SIGNING_KEY}" ]; then
+            echo "缺少 secrets.PLUGIN_SIGNING_KEY（base64 编码的 ed25519 raw 32 字节 seed）" >&2
+            exit 1
+          fi
+          echo "${SIGNING_KEY}" | base64 -d | wc -c | grep -qx 32 \
+            || { echo "PLUGIN_SIGNING_KEY 必须是 base64 编码的 ed25519 raw 32 字节 seed" >&2; exit 1; }
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: 安装前端依赖（插件 web 走 vite，复用主前端 node_modules）
+        run: pnpm install --frozen-lockfile
+
+      - name: 安装签名用 Python 依赖
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user 'cryptography>=42'
+          python3 -c 'from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; print("cryptography ok")'
+
+      - name: 启用 QEMU（跨架构编译）
+        if: github.event.inputs.arch == 'arm64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: 写签名私钥到 runner 临时目录
+        env:
+          SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "${SIGNING_KEY}" > "${RUNNER_TEMP}/plugin_signing.key"
+          ls -l "${RUNNER_TEMP}/plugin_signing.key"
+          echo "PLUGIN_SIGNING_KEY_FILE=${RUNNER_TEMP}/plugin_signing.key" >> "$GITHUB_ENV"
+
+      - name: 打包插件
+        env:
+          PLUGIN: ${{ github.event.inputs.plugin }}
+          ARCH: ${{ github.event.inputs.arch }}
+          PYTHON: python3
+        run: |
+          set -euo pipefail
+          ./plugins/"${PLUGIN}"/pack.sh \
+            --protect \
+            --cluster-uid "${cluster_uid}" \
+            --arch "${ARCH}" \
+            --key "${PLUGIN_SIGNING_KEY_FILE}"
+
+      - name: 清掉私钥
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/plugin_signing.key"
+
+      - name: 定位产物
+        id: artifact
+        env:
+          PLUGIN: ${{ github.event.inputs.plugin }}
+          ARCH: ${{ github.event.inputs.arch }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          zips=(plugins/"${PLUGIN}"/dist/"${PLUGIN}"-*.zip)
+          if [ "${#zips[@]}" -eq 0 ]; then
+            echo "未找到 plugins/${PLUGIN}/dist/${PLUGIN}-*.zip" >&2
+            ls -la "plugins/${PLUGIN}/dist" >&2 || true
+            exit 1
+          fi
+          if [ "${#zips[@]}" -gt 1 ]; then
+            echo "找到多个 zip，取最新修改的一个：" >&2
+            ls -lt "${zips[@]}" >&2
+          fi
+          ZIP="$(ls -t "${zips[@]}" | head -1)"
+          test -f "${ZIP}"
+          # artifact 名：plugin-arch-uid前8（避免同日多集群互相覆盖难辨）
+          UID8="$(printf '%s' "${cluster_uid}" | tr -cd 'A-Za-z0-9' | cut -c1-8)"
+          BASE="$(basename "${ZIP}" .zip)"
+          OUT_NAME="${BASE}-${ARCH}-${UID8}.zip"
+          cp "${ZIP}" "${RUNNER_TEMP}/${OUT_NAME}"
+          echo "path=${RUNNER_TEMP}/${OUT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "name=${OUT_NAME}" >> "$GITHUB_OUTPUT"
+          echo "packed=${ZIP}" >> "$GITHUB_OUTPUT"
+          echo "产物: ${ZIP} → artifact ${OUT_NAME}"
+          unzip -l "${ZIP}" | tail -n 30
+
+      - name: 上传 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: ${{ steps.artifact.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
