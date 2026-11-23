@@ -2,12 +2,18 @@ name: DEV-backend-tiga-case-arm
 
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        description: '构建分支'
+        required: true
+        type: string
+        default: 'yimu-dev'
 
 env:
   DOCKER_IMAGE: deploy_image/tiga-case
   REPOSITORY: 'lowcode-yunti/tiga-case'
-  TAG: yimu-dev
-  BRANCH_NAME: yimu-dev
+  TAG: ${{ github.event.inputs.branch || 'yimu-dev' }}
+  BRANCH_NAME: ${{ github.event.inputs.branch || 'yimu-dev' }}
   DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY_SHANGHAI }}
   DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
 
