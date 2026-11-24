@@ -58,7 +58,7 @@ jobs:
           sbom: false
           push: true
           build-args: |
-           VITE_GENBI_MENU_ENABLED=true
+           VITE_GENBI_MENU_ENABLED=false
            VITE_DATABASE_MENU_ENABLED=false
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}-frontend:liantong-dev
